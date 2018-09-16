@@ -56,15 +56,23 @@ int main(int argc,char **argv) {
     int N = 8192;
     size_t size = N *N* sizeof(double);
 
+    int thread_dim_ll[8];
+    int thread_dim;
+
     double*h_matA = (double*)malloc(size);
     double*h_matB = (double*)malloc(size);
     double*h_matC = (double*)malloc(size); // result
 
-    int loop1; int loop2; // loop variables
+    int loop, loop1, loop2; // loop variables
     float time_spent;
 
     fill_matrix(h_matA,N,N);
     fill_matrix(h_matB,N,N);
+
+    printf("Thread dims\n");
+    for (loop=0;loop<8;loop++){
+        thread_dim_ll[loop]=pow(2,2+loop);
+    }
 
     printf("\nMatrix A (first 10*10 inputs)\n");
     for(loop1 = 0; loop1 < 10; loop1++){
@@ -91,24 +99,22 @@ int main(int argc,char **argv) {
     cudaMemcpy(d_matA, h_matA, size,cudaMemcpyHostToDevice);
     cudaMemcpy(d_matB, h_matB, size,cudaMemcpyHostToDevice);
 
-    // Invoke kernel
-    dim3 threadsPerBlock = (16,16);
-    dim3 blocksPerGrid ((N + threadsPerBlock.x - 1) /threadsPerBlock.x,(N + threadsPerBlock.y - 1) /threadsPerBlock.y);
+    for (loop = 0; loop < 8; loop++){
 
-    cudaEventRecord(start, 0);
-    MatrixMulKernel_col_maj<<<blocksPerGrid, threadsPerBlock>>>(d_matA,d_matB, d_matC, N);
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&time_spent, start, stop);
-    printf("\nTime spent in col maj %f\n",time_spent);
+        //thread dim
+        thread_dim=thread_dim_ll[loop];
+        // Invoke kernel
+        dim3 threadsPerBlock = (thread_dim,thread_dim);
+        dim3 blocksPerGrid ((N + threadsPerBlock.x - 1) /threadsPerBlock.x,(N + threadsPerBlock.y - 1) /threadsPerBlock.y);
 
-    cudaEventRecord(start, 0);
-    MatrixMulKernel_row_maj<<<blocksPerGrid, threadsPerBlock>>>(d_matA,d_matB, d_matC, N);
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&time_spent, start, stop);
-    printf("\nTime spent in row maj %f\n",time_spent);
+        cudaEventRecord(start, 0);
+        MatrixMulKernel_col_maj<<<blocksPerGrid, threadsPerBlock>>>(d_matA,d_matB, d_matC, N);
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&time_spent, start, stop);
+        printf("\nTime spent in col maj %f with threadsPerBlock %d \n",time_spent,thread_dim);
 
+    }
     // h_C contains the result in host memory
     cudaMemcpy(h_matC, d_matC, size,cudaMemcpyDeviceToHost);
 

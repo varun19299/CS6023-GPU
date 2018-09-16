@@ -22,20 +22,29 @@ void print_matrix_to_file(double *mat, unsigned numRows, unsigned numCols)
 }
 fclose(f); }
 
-__global__ void MatrixMulKernel_col_maj(double* M, double* N, double* P, int Width) { 
-    // Calculate the row index of the P element and M
-    int Row = blockIdx.y*blockDim.y+threadIdx.y;
-    // Calculate the column index of P and N
-    int Col = blockIdx.x*blockDim.x+threadIdx.x; 
+__global__ void MatrixMulKernel_col_maj(double* M, double* N, double* P, int Width, int TILE_WIDTH) { 
+    __shared__ float ds_M[TILE_WIDTH][TILE_WIDTH];
+    __shared__ float ds_N[TILE_WIDTH][TILE_WIDTH];
+    int bx = blockIdx.x;  int by = blockIdx.y;
+    int tx = threadIdx.x; int ty = threadIdx.y;
+    int Row = by * blockDim.y + ty;
+    int Col = bx * blockDim.x + tx;
     
-    if ((Row < Width) && (Col < Width)) {
-            float Pvalue = 0;
-        for (int k = 0; k < Width; ++k) {
-            Pvalue += M[Row*Width+k]*N[k*Width+Col];
-        }
-            P[Row*Width+Col] = Pvalue;
-        }
+    
+    // Loop over the M and N tiles required to compute the P element
+    for (int p = 0; p < Width/TILE_WIDTH; ++p) {
+    // Collaborative loading of M and N tiles into shared memory
+    ds_M[ty][tx] = M[Row*Width + p*TILE_WIDTH+tx];
+    ds_N[ty][tx] = N[(p*TILE_WIDTH+ty)*Width + Col];
+    __syncthreads();
     }
+    float Pvalue = 0;
+    for (int i = 0; i < TILE_WIDTH; ++i)
+        Pvalue += ds_M[ty][i] * ds_N[i][tx];
+    __synchthreads();
+    
+    P[Row*Width+Col] = Pvalue;
+}
 
 __global__ void MatrixMulKernel_row_maj(double* M, double* N, double* P, int Width) { 
     // Calculate the row index of the P element and M
