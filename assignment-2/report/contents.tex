@@ -6,7 +6,7 @@ CUDA version 9.0 was used to compile the code, with \lstinline{nvcc} as the devi
 
 \section {Question 1 and 2}
 
-Querying Device parameters via \lstinline{ cudaDeviceProp}.\\
+Matrix Multiplication via thread-wise access to global memory was used.\\
 
 Following parameters were queried:
 \begin{itemize}
@@ -21,28 +21,38 @@ Following parameters were queried:
 
 \subsection {Code Blocks (pertinent only)}
 \begin{lstlisting}
-cudaGetDeviceCount(&nDevices);
-    for (int i = 0; i < nDevices; i++) {
-        cudaDeviceProp prop;
-        cudaGetDeviceProperties(&prop, i);
-        printf("Device Number: %d\n", i);
-        printf("  Device name: %s\n", prop.name);
-        printf("  Memory Clock Rate (KHz): %d\n",prop.memoryClockRate);
-        printf("  Memory Bus Width (bits): %d\n",prop.memoryBusWidth);
-        printf("  Is L1 Cache supported globally :(0/1) %d\n",prop.globalL1CacheSupported);
-        printf("  Is L1 Cache supported locally :(0/1) %d\n",prop.localL1CacheSupported);
-       // ..Other Device Properties.. //
-        printf("  No of registers available in a streaming multiprocessor : %d\n",prop.regsPerMultiprocessor);
-        printf("  Warp Size :(bytes) %d\n",prop.warpSize);
-        printf("  Grid Size :(bytes) %ld\n",prop.maxGridSize);
-        printf("  Total memory :(bytes) %ld\n",prop.totalGlobalMem);
-        printf("  Peak Memory Bandwidth (GB/s): %f\n\n",2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6);
+_global__ void MatrixMulKernel_col_maj(double* M, double* N, double* P, int Width) { 
+    // Calculate the row index of the P element and M
+    int Row = blockIdx.y*blockDim.y+threadIdx.y;
+    // Calculate the column index of P and N
+    int Col = blockIdx.x*blockDim.x+threadIdx.x; 
+    
+    if ((Row < Width) && (Col < Width)) {
+            float Pvalue = 0;
+        for (int k = 0; k < Width; ++k) {
+            Pvalue += M[Row*Width+k]*N[k*Width+Col];
+        }
+            P[Row*Width+Col] = Pvalue;
+        }
     }
-}
+
+__global__ void MatrixMulKernel_row_maj(double* M, double* N, double* P, int Width) { 
+    // Calculate the row index of the P element and M
+    int Row = blockIdx.y*blockDim.y+threadIdx.x;
+    // Calculate the column index of P and N
+    int Col = blockIdx.x*blockDim.x+threadIdx.y; 
+    
+    if ((Row < Width) && (Col < Width)) {
+            float Pvalue = 0;
+        for (int k = 0; k < Width; ++k) {
+            Pvalue += M[Row*Width+k]*N[k*Width+Col];
+        }
+            P[Row*Width+Col] = Pvalue;
+        }
+    }
 \end{lstlisting}
 
-We run the list of properties for all possible GPU's present in the given machine.
-
+We run two kernels, one with the fastest varying index as
 \bigskip
 \subsection {Roof-line Plot}
 \noindent Plot of the roof-line model for the queried GPU.\\
@@ -57,7 +67,7 @@ The resultant plot : \textbf{Figure 1}
 
 \begin{figure}[ht]
 \centering
-\includegraphics[angle=0,width=0.8\textwidth]{Figure_1.png}
+%%\includegraphics[angle=0,width=0.8\textwidth]{Figure_1.png}
 \caption{Roof-line model for \textbf{GTX 1080 Ti}}
 \end{figure}
 
@@ -153,7 +163,7 @@ The consequent plot: \textbf{Figure 2}
 
 \begin{figure}[ht]
 \centering
-\includegraphics[angle=0,width=0.7\textwidth]{Figure_2.png}
+%%\includegraphics[angle=0,width=0.7\textwidth]{Figure_2.png}
 \caption{Average Runtime versus Threads per Block for \textbf{GTX 1080 Ti}}
 \end{figure}
 
@@ -216,7 +226,7 @@ The consequent plot: \textbf{Figure 3} \\
 
 \begin{figure}[ht]
 \centering
-\includegraphics[angle=0,width=0.7\textwidth]{Figure_3.png}
+%%\includegraphics[angle=0,width=0.7\textwidth]{Figure_3.png}
 \caption{Average Runtime versus Ops per Thread for \textbf{GTX 1080 Ti}}
 \end{figure}
 
@@ -253,7 +263,7 @@ Again, empirically, we observe the changes in run-time per vector size of the ra
  
  \begin{figure}[ht]
 \centering
-\includegraphics[angle=0,width=0.7\textwidth]{Figure_4.png}
+%%\includegraphics[angle=0,width=0.7\textwidth]{Figure_4.png}
 \caption{Average Runtime versus Vector Size for \textbf{GTX 1080 Ti}}
 \end{figure}
 

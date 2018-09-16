@@ -16,7 +16,7 @@
 \renewcommand{\headrulewidth}{0.4pt}
 \fancyhead{}
 \fancyhead[L]{CS6023 GPU Programming} 
-\fancyhead[R]{Varun EE16B068} %%% Vyplnte sve jmeno a prijmeni
+\fancyhead[R]{Varun EE16B068} 
 \fancyfoot{}
 \fancyfoot[C]{\thepage}
 
@@ -31,21 +31,21 @@
 \definecolor{dgray}{gray}{0.35} 
 \definecolor{lgray}{gray}{0.95} 
 
-\lstset{ % nastaveni vzhledu R-kodu
-language=R, % nastaveni jazyka R
-basicstyle=\ttfamily\small, % typ a velikost pisma R-kodu
-backgroundcolor=\color{lgray}, % barva pozadi R-kodu
-commentstyle=\ttfamily\small\itshape\color{dgray}, % barva komentare k funkcim
-showstringspaces=false, % zakaz zvyraznovani mezer
-numbers=left, % cislovani vlevo
-numberstyle=\ttfamily\small, % typ pisma a velikost cislovani
-stepnumber=1, % cislovani po kroku jedna
-firstnumber=last, % kumulativni cislovani radku v po sobe nasledujicich castech s R-kodem
-breaklines=T} % automaticke zalamovani kodu na konci radku
+\lstset{ 
+language=Python, 
+basicstyle=\ttfamily\small, 
+backgroundcolor=\color{lgray},
+commentstyle=\ttfamily\small\itshape\color{dgray}, 
+showstringspaces=false, 
+numbers=left, 
+numberstyle=\ttfamily\small, 
+stepnumber=1, 
+firstnumber=last, 
+breaklines=T} 
 
 \begin{document}
 
-\input{UCO-prijmeni-jmeno-predmet-title-page}
+\input{assignment-2/report/title-page.tex}
 \addtocontents{toc}{~\hfill\textbf{Page}\par}
-\input{UCO-prijmeni-jmeno-predmet-text} % vlozi soubor s hlavnim textem
+\input{assignment-2/report/contents.tex}
 \end{document}
