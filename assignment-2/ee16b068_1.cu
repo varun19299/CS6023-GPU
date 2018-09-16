@@ -1,52 +1,118 @@
-#include <stdio.h> 
+#include <stdlib.h>
+#include <stdio.h>
 
-int main() {
-    FILE *outfile;
-    int nDevices;
-
-    //output file pointer
-    outfile = fopen("ee16b068_1.txt", "w");
-
-    cudaGetDeviceCount(&nDevices);
-    for (int i = 0; i < nDevices; i++) {
-        cudaDeviceProp prop;
-        cudaGetDeviceProperties(&prop, i);
-        //
-        printf("Device Number: %d\n", i);
-        //
-        printf("  Device name: %s\n", prop.name);
-        //
-        printf("  Memory Clock Rate (KHz): %d\n",prop.memoryClockRate);
-        //
-        printf("  Memory Bus Width (bits): %d\n",prop.memoryBusWidth);
-        //
-        printf("  Is L1 Cache supported globally :(0/1) %d\n",prop.globalL1CacheSupported);
-        fprintf(outfile,"%d\n",prop.globalL1CacheSupported);
-        //
-        printf("  Is L1 Cache supported locally :(0/1) %d\n",prop.localL1CacheSupported);
-        fprintf(outfile,"%d\n",prop.localL1CacheSupported);
-        //
-        printf("  L2 Cache Size (bytes) : %d\n",prop.l2CacheSize);
-        fprintf(outfile,"%d\n",prop.l2CacheSize);
-        //
-        printf("  Max no of threads per block : %d\n",prop.maxThreadsPerBlock);
-        fprintf(outfile,"%d\n",prop.maxThreadsPerBlock);
-        //
-        printf("  No of registers available in a block : %d\n",prop.regsPerBlock);
-        fprintf(outfile,"%d\n",prop.regsPerBlock);
-        //
-        printf("  No of registers available in a streaming multiprocessor : %d\n",prop.regsPerMultiprocessor);
-        fprintf(outfile,"%d\n",prop.regsPerMultiprocessor);
-        //
-        printf("  Warp Size :(bytes) %d\n",prop.warpSize);
-        fprintf(outfile,"%d\n",prop.warpSize);
-        //
-        printf("  Grid Size :(bytes) %ld\n",prop.maxGridSize);
-        //
-        printf("  Total memory :(bytes) %ld\n",prop.totalGlobalMem);
-        fprintf(outfile,"%ld\n",prop.totalGlobalMem);
-        //
-        printf("  Peak Memory Bandwidth (GB/s): %f\n\n",2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6);
-    }
+void fill_matrix(double *mat, unsigned numRows, unsigned numCols)
+{
+    for(unsigned i=0; i < numRows; i++)
+       for(unsigned j=0; j < numCols; j++)
+       {
+         mat[i*numCols + j] = i*2.1f + j*3.2f;
+       }
 }
 
+void print_matrix_to_file(double *mat, unsigned numRows, unsigned numCols)
+{
+  const char *fname = "assignment2_1_out";
+  FILE *f = fopen(fname, "w");
+  for(unsigned i=0; i < numRows; i++)
+  {
+     for(unsigned j=0; j < numCols; j++)
+     fprintf(f,"%4.4f ", mat[i*numCols + j]);
+     fprintf(f,"\n");
+}
+fclose(f); }
+
+
+__global__ void MatrixMulKernel_row_maj(float* M, float* N, float* P, int Width) { 
+    // Calculate the row index of the P element and M
+    int Row = blockIdx.y*blockDim.y+threadIdx.y;
+    // Calculate the column index of P and N
+    int Col = blockIdx.x*blockDim.x+threadIdx.x; 
+    
+    if ((Row < Width) && (Col < Width)) {
+            float Pvalue = 0;
+        for (int k = 0; k < Width; ++k) {
+            Pvalue += M[Row*Width+k]*N[k*Width+Col];
+        }
+            P[Row*Width+Col] = Pvalue;
+        }
+    }
+
+    __global__ void MatrixMulKernel_col_maj(float* M, float* N, float* P, int Width) { 
+        // Calculate the row index of the P element and M
+        int Row = blockIdx.y*blockDim.y+threadIdx.x;
+        // Calculate the column index of P and N
+        int Col = blockIdx.x*blockDim.x+threadIdx.y; 
+        
+        if ((Row < Width) && (Col < Width)) {
+                float Pvalue = 0;
+            for (int k = 0; k < Width; ++k) {
+                Pvalue += M[Row*Width+k]*N[k*Width+Col];
+            }
+                P[Row*Width+Col] = Pvalue;
+            }
+        }
+
+int main(int argc,char **argv) {
+    int N = 8192;
+    size_t size = N *N* sizeof(double);
+
+    double*h_matA = (double*)malloc(size);
+    double*h_matB = (double*)malloc(size);
+    double*h_matC = (double*)malloc(size); // result
+
+    int loop1; int loop2; // loop variables
+
+    fill_matrix(h_matA,N,N);
+    fill_matrix(h_matB,N,N);
+
+    printf("\nMatrix A (first 10*10 inputs)\n");
+    for(loop1 = 0; loop1 < 10; loop1++){
+        for (loop2=0;loop2 < 10; loop2++)
+            printf("%f ", h_matA[loop1][loop2]);
+    }
+
+    printf("\nMatrix B (first 10*10 inputs)\n");
+    for(loop1 = 0; loop1 < 10; loop1++){
+        for (loop2=0;loop2 < 10; loop2++)
+            printf("%f ", h_matB[loop1][loop2]);
+    }
+
+    double* d_matA;   cudaMalloc(&d_matA, size);
+    double* d_matB;   cudaMalloc(&d_matB, size);
+    double* d_matC;   cudaMalloc(&d_matC, size);
+
+    // Copy vectors from host memory to device memory
+    cudaMemcpy(d_matA, h_matA, size,cudaMemcpyHostToDevice);
+    cudaMemcpy(d_matB, h_matB, size,cudaMemcpyHostToDevice);
+
+    // Invoke kernel
+    dim3 threadsPerBlock = (16,16);
+    dim3 blocksPerGrid ((N + threadsPerBlock.x - 1) /threadsPerBlock.x,(N + threadsPerBlock.y - 1) /threadsPerBlock.y);
+    MatrixMulKernel_row_maj<<<blocksPerGrid, threadsPerBlock>>>(d_matA,d_matB, d_matC, N);
+
+     // h_C contains the result in host memory
+    cudaMemcpy(h_matC, d_matC, size,cudaMemcpyDeviceToHost);
+
+    printf("\nMatrix C (first 10*10 outputs)\n");
+    for(loop1 = 0; loop1 < 10; loop1++){
+        for (loop2=0;loop2 < 10; loop2++)
+            printf("%f ", h_matC[loop1][loop2]);
+    }
+      
+
+    // Log outputs
+    printf("\nWritting to file assignment_2_1_out as Mat C");
+    print_matrix_to_file(h_matC,N,N);
+
+    // Free device memory
+    cudaFree(d_matA);
+    cudaFree(d_matB);
+    cudaFree(d_matC);
+
+    // Free host memory
+    free(h_matA);
+    free(h_matB);
+    free(h_matC);
+    return 0;
+}
