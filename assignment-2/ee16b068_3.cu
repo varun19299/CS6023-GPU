@@ -1,5 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <cuda.h>
+#include <stdlib.h>
+
 
 void fill_matrix(double *mat, unsigned numRows, unsigned numCols)
 {
@@ -12,7 +15,7 @@ void fill_matrix(double *mat, unsigned numRows, unsigned numCols)
 
 void print_matrix_to_file(double *mat, unsigned numRows, unsigned numCols)
 {
-  const char *fname = "assignment2_1_out";
+  const char *fname = "assignment2_3_out";
   FILE *f = fopen(fname, "w");
   for(unsigned i=0; i < numRows; i++)
   {
@@ -22,9 +25,15 @@ void print_matrix_to_file(double *mat, unsigned numRows, unsigned numCols)
 }
 fclose(f); }
 
-__global__ void MatrixMulKernel_col_maj(double* M, double* N, double* P, int Width, int TILE_WIDTH) { 
-    __shared__ float ds_M[TILE_WIDTH][TILE_WIDTH];
-    __shared__ float ds_N[TILE_WIDTH][TILE_WIDTH];
+template<int TILE_WIDTH>
+__global__ void MatrixMulKernel_col_maj(double* M, double* N, double* P, int Width) { 
+    extern __shared__ double buffer[];
+
+    double *ds_M = &buffer[0];
+    double *ds_N = &buffer[TILE_WIDTH*Width];
+
+    //__shared__ float ds_M[Width][Width];
+    //__shared__ float ds_N[Width][Width];
     int bx = blockIdx.x;  int by = blockIdx.y;
     int tx = threadIdx.x; int ty = threadIdx.y;
     int Row = by * blockDim.y + ty;
@@ -33,113 +42,110 @@ __global__ void MatrixMulKernel_col_maj(double* M, double* N, double* P, int Wid
     
     // Loop over the M and N tiles required to compute the P element
     for (int p = 0; p < Width/TILE_WIDTH; ++p) {
+        printf("%d",p);
     // Collaborative loading of M and N tiles into shared memory
-    ds_M[ty][tx] = M[Row*Width + p*TILE_WIDTH+tx];
-    ds_N[ty][tx] = N[(p*TILE_WIDTH+ty)*Width + Col];
+    ds_M[ty*p*Width + tx*p*blockDim.x ] = M[Row*Width + p*TILE_WIDTH+tx];
+    ds_N[ty*p*Width*blockDim.y + tx*p] = N[(p*TILE_WIDTH+ty)*Width + Col];
     __syncthreads();
     }
-    float Pvalue = 0;
-    for (int i = 0; i < TILE_WIDTH; ++i)
-        Pvalue += ds_M[ty][i] * ds_N[i][tx];
-    __synchthreads();
-    
+
+    double Pvalue = 0;
+    for (int i = 0; i < TILE_WIDTH; ++i){
+        Pvalue += ds_M[ty*Width + i] * ds_N[i*Width + tx];
+        printf("Pval %f",TILE_WIDTH);
+    }
+    __syncthreads();
+    printf("Pval %f",Pvalue);
     P[Row*Width+Col] = Pvalue;
 }
 
-__global__ void MatrixMulKernel_row_maj(double* M, double* N, double* P, int Width) { 
-    // Calculate the row index of the P element and M
-    int Row = blockIdx.y*blockDim.y+threadIdx.x;
-    // Calculate the column index of P and N
-    int Col = blockIdx.x*blockDim.x+threadIdx.y; 
-    
-    if ((Row < Width) && (Col < Width)) {
-            float Pvalue = 0;
-        for (int k = 0; k < Width; ++k) {
-            Pvalue += M[Row*Width+k]*N[k*Width+Col];
-        }
-            P[Row*Width+Col] = Pvalue;
-        }
-    }
-
 int main(int argc,char **argv) {
-    int N = 8192;
-    size_t size = N *N* sizeof(double);
+    int N_ll[2]; int N;
+    
 
-    double*h_matA = (double*)malloc(size);
-    double*h_matB = (double*)malloc(size);
-    double*h_matC = (double*)malloc(size); // result
-
-    int loop1; int loop2; // loop variables
+    int loop, loop1, loop2; // loop variables
     float time_spent;
 
-    fill_matrix(h_matA,N,N);
-    fill_matrix(h_matB,N,N);
+    N_ll[0]=16; N_ll[1]=8192;
 
-    printf("\nMatrix A (first 10*10 inputs)\n");
-    for(loop1 = 0; loop1 < 10; loop1++){
-        for (loop2=0;loop2 < 10; loop2++)
-            printf("%f ", *(h_matA + N*loop1 + loop2));
-    }
+    for (loop=0;loop<2;loop++){
 
-    printf("\n\nMatrix B (first 10*10 inputs)\n");
-    for(loop1 = 0; loop1 < 10; loop1++){
-        for (loop2=0;loop2 < 10; loop2++)
-            printf("%f ", *(h_matB + N*loop1 + loop2));
-    }
+        N=N_ll[loop];
 
-    double* d_matA;   cudaMalloc(&d_matA, size);
-    double* d_matB;   cudaMalloc(&d_matB, size);
-    double* d_matC;   cudaMalloc(&d_matC, size);
+        size_t size = N *N* sizeof(double);
 
-    //GPU timing
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+        double*h_matA = (double*)malloc(size);
+        double*h_matB = (double*)malloc(size);
+        double*h_matC = (double*)malloc(size); // result
 
-    // Copy vectors from host memory to device memory
-    cudaMemcpy(d_matA, h_matA, size,cudaMemcpyHostToDevice);
-    cudaMemcpy(d_matB, h_matB, size,cudaMemcpyHostToDevice);
+        fill_matrix(h_matA,N,N);
+        fill_matrix(h_matB,N,N);
 
-    // Invoke kernel
-    dim3 threadsPerBlock = (16,16);
-    dim3 blocksPerGrid ((N + threadsPerBlock.x - 1) /threadsPerBlock.x,(N + threadsPerBlock.y - 1) /threadsPerBlock.y);
+        printf("\nMatrix A (first 10*10 inputs)\n");
+        for(loop1 = 0; loop1 < 10; loop1++){
+            for (loop2=0;loop2 < 10; loop2++)
+                printf("%f ", *(h_matA + N*loop1 + loop2));
+            printf("\n");
+        }
 
-    cudaEventRecord(start, 0);
-    MatrixMulKernel_col_maj<<<blocksPerGrid, threadsPerBlock>>>(d_matA,d_matB, d_matC, N);
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&time_spent, start, stop);
-    printf("\nTime spent in col maj %f\n",time_spent);
+        printf("\n\nMatrix B (first 10*10 inputs)\n");
+        for(loop1 = 0; loop1 < 10; loop1++){
+            for (loop2=0;loop2 < 10; loop2++)
+                printf("%f ", *(h_matB + N*loop1 + loop2));
+            printf("\n");
+        }
 
-    cudaEventRecord(start, 0);
-    MatrixMulKernel_row_maj<<<blocksPerGrid, threadsPerBlock>>>(d_matA,d_matB, d_matC, N);
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&time_spent, start, stop);
-    printf("\nTime spent in row maj %f\n",time_spent);
+        double* d_matA;   cudaMalloc(&d_matA, size);
+        double* d_matB;   cudaMalloc(&d_matB, size);
+        double* d_matC;   cudaMalloc(&d_matC, size);
 
-    // h_C contains the result in host memory
-    cudaMemcpy(h_matC, d_matC, size,cudaMemcpyDeviceToHost);
+        //GPU timing
+        cudaEvent_t start, stop;
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
 
-    printf("\n\nMatrix C (first 10*10 outputs)\n");
-    for(loop1 = 0; loop1 < 10; loop1++){
-        for (loop2=0;loop2 < 10; loop2++)
-            printf("%f ", *(h_matC + N*loop1 + loop2));
-    }
-      
+        // Copy vectors from host memory to device memory
+        cudaMemcpy(d_matA, h_matA, size,cudaMemcpyHostToDevice);
+        cudaMemcpy(d_matB, h_matB, size,cudaMemcpyHostToDevice);
 
-    // Log outputs
-    printf("\nWritting to file assignment_2_1_out as Mat C");
-    print_matrix_to_file(h_matC,N,N);
+        // Invoke kernel
+        dim3 threadsPerBlock (16,16);
+        dim3 blocksPerGrid ((N + threadsPerBlock.x - 1) /threadsPerBlock.x,(N + threadsPerBlock.y - 1) /threadsPerBlock.y);
 
-    // Free device memory
-    cudaFree(d_matA);
-    cudaFree(d_matB);
-    cudaFree(d_matC);
+        cudaEventRecord(start, 0);
+        size_t blocksize = 2 * N * 16;
+        (MatrixMulKernel_col_maj<16>)<<<blocksPerGrid, threadsPerBlock, sizeof(double)*blocksize>>>(d_matA,d_matB, d_matC, N);
+        cudaError_t err1 = cudaPeekAtLastError();
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&time_spent, start, stop);
+        printf("\nTime spent in col maj %f\n",time_spent);
 
-    // Free host memory
-    free(h_matA);
-    free(h_matB);
-    free(h_matC);
+        // h_C contains the result in host memory
+        cudaMemcpy(h_matC, d_matC, size,cudaMemcpyDeviceToHost);
+
+        printf("\n\nMatrix C (first 10*10 outputs)\n");
+        for(loop1 = 0; loop1 < 10; loop1++){
+            for (loop2=0;loop2 < 10; loop2++)
+                printf("%f ", *(h_matC + N*loop1 + loop2));
+            printf("\n");
+        }
+
+        // Log outputs
+        printf("\nWritting to file assignment_2_1_out as Mat C");
+        print_matrix_to_file(h_matC,N,N);
+
+        // Free device memory
+        cudaFree(d_matA);
+        cudaFree(d_matB);
+        cudaFree(d_matC);
+
+        // Free host memory
+        free(h_matA);
+        free(h_matB);
+        free(h_matC);
+        
+        
+    }   
     return 0;
 }
