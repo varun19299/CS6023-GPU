@@ -29,8 +29,8 @@ template<int TILE_WIDTH>
 __global__ void MatrixMulKernel_col_maj(double* M, double* N, double* P, int Width) { 
     extern __shared__ double buffer[];
 
-    double *ds_M = &buffer[0];
-    double *ds_N = &buffer[TILE_WIDTH*Width];
+    double *ds_M = &buffer[0]; // TILE_WIDTH WIDTH
+    double *ds_N = &buffer[TILE_WIDTH*Width]; // WIDTH TILE_WIDTH
 
     //__shared__ float ds_M[Width][Width];
     //__shared__ float ds_N[Width][Width];
@@ -42,20 +42,17 @@ __global__ void MatrixMulKernel_col_maj(double* M, double* N, double* P, int Wid
     
     // Loop over the M and N tiles required to compute the P element
     for (int p = 0; p < Width/TILE_WIDTH; ++p) {
-        printf("%d",p);
     // Collaborative loading of M and N tiles into shared memory
-    ds_M[ty*p*Width + tx*p*blockDim.x ] = M[Row*Width + p*TILE_WIDTH+tx];
-    ds_N[ty*p*Width*blockDim.y + tx*p] = N[(p*TILE_WIDTH+ty)*Width + Col];
+    ds_M[ty*Width + tx + p*blockDim.x ] = M[Row*Width + p*TILE_WIDTH+tx];
+    ds_N[ty*TILE_WIDTH + blockDim.y*TILE_WIDTH*p + tx] = N[(p*TILE_WIDTH+ty)*Width + Col];
     __syncthreads();
     }
 
     double Pvalue = 0;
     for (int i = 0; i < TILE_WIDTH; ++i){
         Pvalue += ds_M[ty*Width + i] * ds_N[i*Width + tx];
-        printf("Pval %f",TILE_WIDTH);
     }
     __syncthreads();
-    printf("Pval %f",Pvalue);
     P[Row*Width+Col] = Pvalue;
 }
 

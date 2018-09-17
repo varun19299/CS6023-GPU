@@ -12,7 +12,7 @@ void fill_matrix(double *mat, unsigned numRows, unsigned numCols)
 
 void print_matrix_to_file(double *mat, unsigned numRows, unsigned numCols)
 {
-  const char *fname = "assignment2_4_out";
+  const char *fname = "assignment2_5_out";
   FILE *f = fopen(fname, "w");
   for(unsigned i=0; i < numRows; i++)
     {

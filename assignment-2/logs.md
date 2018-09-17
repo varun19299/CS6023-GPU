@@ -26,6 +26,10 @@ Time spent in col maj 17604.121094 with threadsPerBlock 512
 
 ## Question 3
 
+Time spent in col maj 0.022528
+
+Second one doesn't execute
+
 ## Question 4
 
 Time spent in col maj 4015.230225
@@ -42,3 +46,5 @@ Time spent in col maj for tile 32 x 32 4042.729004
 Time spent in col maj 3972.187012
 
 ## Question 7
+
+Optimal time is 32806.507812, threads per block is 32 x 32, tile size is 32 x 32 blocks per grid is 257 x 1025.

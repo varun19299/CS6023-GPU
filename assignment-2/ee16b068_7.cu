@@ -12,7 +12,7 @@ void fill_matrix(double *mat, unsigned numRows, unsigned numCols)
 
 void print_matrix_to_file(double *mat, unsigned numRows, unsigned numCols)
 {
-  const char *fname = "assignment2_4_out";
+  const char *fname = "assignment2_7_out";
   FILE *f = fopen(fname, "w");
   for(unsigned i=0; i < numRows; i++)
     {
@@ -70,8 +70,8 @@ __global__ void MatrixMulKernel_col_maj(double* M, double* N, double* P, int M_r
 
 int main(int argc,char **argv) {
     int M_r,M_c,N_c;
-    int TILE_WIDTH_ll[5], TILE_WIDTH;
-    float time_spent_ll[5], time_spent;
+    int TILE_WIDTH_ll[4], TILE_WIDTH;
+    float time_spent_ll[4], time_spent;
     
     int loop,loop1, loop2,min; // loop variables
 
@@ -90,8 +90,8 @@ int main(int argc,char **argv) {
     fill_matrix(h_matA,M_r,M_c);
     fill_matrix(h_matB,M_c,N_c);
 
-    for (loop = 0; loop<5; loop++){
-        TILE_WIDTH_ll[loop]=pow(2,1+loop);
+    for (loop = 0; loop<4; loop++){
+        TILE_WIDTH_ll[loop]=pow(2,2+loop);
     }
 
     printf("\nMatrix A (first 10*10 inputs)\n");
@@ -153,7 +153,7 @@ int main(int argc,char **argv) {
     }
     
     min=0;
-    for ( loop = 1 ; loop < 5 ; loop++ ) 
+    for ( loop = 1 ; loop < 4 ; loop++ ) 
     {
         if ( time_spent_ll[loop] < time_spent_ll[min] ) 
         {
