@@ -6,22 +6,29 @@ CUDA version 9.0 was used to compile the code, with \lstinline{nvcc} as the devi
 
 \section {Question 1 and 2}
 
-Matrix Multiplication via thread-wise access to global memory was used.\\
+Matrix Multiplication via thread-wise access to global memory was used. \\
 
-Following parameters were queried:
-\begin{itemize}
-\item Scope of support of L1 Cache (Global or local): \quad \textbf{Yes}
-\item Size of L2 Cache: \quad \textbf{Yes}
-\item Maximum permissible threads per block: \quad \textbf{1024}
-\item Registers allocated per block: \quad \textbf{65536}
-\item Registers available in a streaming multiprocessor: \quad \textbf{65536}
-\item Warp Size (bytes) : \quad \textbf{32}
-\item Total amount of memory available in the GPU (in bytes): \quad \textbf{11719409664} (12GB)
-\end{itemize}
+We implement two matrix multiplication kernels: one for column major access ( fastest varying y) and one for row major access (fastest varying x). We utilise \textit{Cuda Events } to time the two runs. The results may be replicated by running,
+
+\begin{lstlisting}[numbers = none]
+./ee16b068_1.cu
+\end{lstlisting}
+
+\subsection{Run Timing and Interpretation}
+
+\begin{lstlisting}[numbers = none]
+Time spent in col maj 28395.593750
+
+Time spent in row maj 46189.101562
+\end{lstlisting}
+
+This can be attributed to the fact that DRAM bursts are more efficiently accessed with simultaneous access to the same row. For parallel access this means each thread should ideally access different rows with time, but the same row spatially. Hence, column major outperforms row major. \\
+
+For questions 2,3 , we shall consider column major timing only. \\
 
 \subsection {Code Blocks (pertinent only)}
 \begin{lstlisting}
-_global__ void MatrixMulKernel_col_maj(double* M, double* N, double* P, int Width) { 
+__global__ void MatrixMulKernel_col_maj(double* M, double* N, double* P, int Width) { 
     // Calculate the row index of the P element and M
     int Row = blockIdx.y*blockDim.y+threadIdx.y;
     // Calculate the column index of P and N
@@ -50,225 +57,232 @@ __global__ void MatrixMulKernel_row_maj(double* M, double* N, double* P, int Wid
             P[Row*Width+Col] = Pvalue;
         }
     }
+
+\end{lstlisting}
+\bigskip
+
+\section{Question 2}
+
+We now use similar code to question 1, except, varying threadsPerBlock as a parameter, from 4 to 32. (We could use up to 1024 threads a block, and for two dimensional threads, this is $32^2$). Nevertheless, we include upto 128, and note any errors. \\
+
+Corresponding plot in \textbf{Figure 1}\\
+
+The noted performance is:
+
+\begin{figure}[ht]
+\centering
+\includegraphics[angle=0,width=0.7\textwidth]{assignment-2/report/q2.png}
+\caption{Naive Matrix Multiplication versus Threads per Block for \textbf{GTX 1080 Ti}}
+\end{figure}
+
+
+\section {Question 3 }
+
+We utilise the shared memory, however, not via tiling, but rather just using dependencies of each block.  Assuming that a block is of size $Tile Width * Tile Width$, the numbers access directly (no iterartions) are $2 * Tile Width * Matrix Width$. Note that, here for the sake of simplicity we are working with square matrices. We find the time taken for the same multiplication as in \textbf{Question 1} with this new strategy. \\
+
+In the first part of this questionn, we use a $16 * 16$ matrix, and obtain the following:
+
+\begin{lstlisting}[numbers = none]
+Time spent in col maj 0.019232
 \end{lstlisting}
 
-We run two kernels, one with the fastest varying index as
-\bigskip
-\subsection {Roof-line Plot}
-\noindent Plot of the roof-line model for the queried GPU.\\
+In the second case, we use the original size of $8192$. Considering the smaller size of shared memory (as opposed to global memory, we expect this to fail, returning a null matrix output). \\
 
-The Roof-line model helps understand the bottlenecks in achieving greater performance. Till a certain operational intensity, it is limited by the bandwidth of global context transfer (host to device data). Further, there is the peak \textbf[TFLOPS] limit, which is a hardware-architecture limit.\\
+\textit{cudaPeekErrors} reveals the lack of sufficient shared memory in the second case. \\
 
-For the case of the \textit{GeForce 1080 Ti}, the peak FLOPS may be computed as:
-$$ Cores * FLOPS *Clock Frequency$$
-This yields 11.3 T FLOPS for the GPU, which matches closely with the manufacturer's benchmarks (11.5). Peak data bandwidth is obtained from the device query.
-
-The resultant plot : \textbf{Figure 1}
-
-\begin{figure}[ht]
-\centering
-%%\includegraphics[angle=0,width=0.8\textwidth]{Figure_1.png}
-\caption{Roof-line model for \textbf{GTX 1080 Ti}}
-\end{figure}
-
-  \subsection{Other Details}
-Device Number: 0
-  
-  
-  \begin{table}[ht]
-\footnotesize
-\centering
-\begin{tabular}{r||rrr}
-Parameter & Specifics  \\ 
- \hline \hline
-Device name & GeForce GTX 1080 Ti \\
-  Memory Clock Rate (KHz) & 5505000 \\
-  Memory Bus Width (bits) & 352 \\
-  Is L1 Cache supported globally & Yes \\
-  Is L1 Cache supported locally & Yes \\
-  L2 Cache Size (bytes) & 2883584 \\
-  Max no of threads per block & 1024 \\
-  No of registers available in a block & 65536 \\
-  No of registers available in a streaming multiprocessor & 65536 \\
-  Warp Size (bytes)&  32 \\
-  Grid Size (bytes) & 140731727872496 \\
-  Total memory (bytes) & 11719409664 \\
-  Peak Memory Bandwidth (GB/s) & 484.440000 \\
-\end{tabular}
-\caption{Device specifications, \textit{device:0}}
-\end{table}
-
-\newpage
-
-\section {Question 3 and 4}
-\noindent We find the optimal number of threads per block to run the given vector addition empirically. \\
-
-\textbf{Question 3} involves writing kernel functions to implement vector addition over multiple threads, one operation each thread. We output the result of adding two $2^{15} $sized vectors, which are randomly generated. \\
-
-For \textbf{Question 4}, we empirically determine the optimal number of threads per block. From \textbf{Question 1} we know that the maximum permissible threads per block is 1024, hence we vary the threads per block from 128 to 1024 in powers of 2, and calculate the run-time in each case. \\
-
-Note that, the run time has been calculated without considering the host allocation time. We believe that this is a valid choice, since the host allocation time maybe isolated for each process and therefore can be effectively excluded from the run time calculations.\\
+\begin{lstlisting}[numbers = none]
+ cudaError_t err1 = cudaPeekAtLastError();//To capture last error in function call
+\end{lstlisting}
 
 \subsection{Code Changes}
+
+We use the concept of templates and external shared registers to dynamically declare arrays. Reference : CUDA Documentation. \\
+
 \begin{lstlisting}
-	__global__ void VecAdd(float* A, float* B, float* C, int N){
-      // Host code
-      int i = blockDim.x * blockIdx.x + threadIdx.x;
-      if (i < N)
-          C[i] = A[i] + B[i];
-    }
-    // .... //
+	__global__ void MatrixMulKernel_col_maj(double* M, double* N, double* P, int Width) { 
+    extern __shared__ double buffer[];
+
+    double *ds_M = &buffer[0]; // TILE_WIDTH WIDTH
+    double *ds_N = &buffer[TILE_WIDTH*Width]; // WIDTH TILE_WIDTH
+
+    //__shared__ float ds_M[Width][Width];
+    //__shared__ float ds_N[Width][Width];
+    int bx = blockIdx.x;  int by = blockIdx.y;
+    int tx = threadIdx.x; int ty = threadIdx.y;
+    int Row = by * blockDim.y + ty;
+    int Col = bx * blockDim.x + tx;
     
-    printf("Array A (first 10 values) \n ");
-    for(loop = 0; loop < N; loop++){
-    h_A[loop] = rand() % 100 + 1;
-      if (loop<10){
-          printf("%f ", h_A[loop]);
-      }
+    
+    // Loop over the M and N tiles required to compute the P element
+    for (int p = 0; p < Width/TILE_WIDTH; ++p) {
+    // Collaborative loading of M and N tiles into shared memory
+    ds_M[ty*Width + tx + p*blockDim.x ] = M[Row*Width + p*TILE_WIDTH+tx];
+    ds_N[ty*TILE_WIDTH + blockDim.y*TILE_WIDTH*p + tx] = N[(p*TILE_WIDTH+ty)*Width + Col];
+    __syncthreads();
     }
 
-    printf("\nArray B (first 10 values) \n ");
-    for(loop = 0; loop < N; loop++){
-        h_B[loop] = rand() % 100 + 1;
-        if (loop<10){
-            printf("%f ", h_B[loop]);
-       }
-     }
-// .... //
-cudaEventRecord(start, 0);
-VecAdd<<<blocksPerGrid, threadsPerBlock>>>(d_A,d_B, d_C, N);
-cudaEventRecord(stop, 0);
-cudaEventSynchronize(stop);
-cudaEventElapsedTime(&time_spent, start, stop);
-time_spent=time_spent/(avg_loop-1)*10;
+    double Pvalue = 0;
+    for (int i = 0; i < TILE_WIDTH; ++i){
+        Pvalue += ds_M[ty*Width + i] * ds_N[i*Width + tx];
+    }
+    __syncthreads();
+    P[Row*Width+Col] = Pvalue;
+}
 \end{lstlisting} \\
 
-\begin{table}[ht]
-\footnotesize
-\centering
-\begin{tabular}{r||rrr}
- SI (vector addition of $2^{15}$ size) & Threads per Block (powers of 2) & Average GPU run-time (for 10 runs)  \\ 
- \hline \hline
-1 & 32 &  0.312521 \\ 
-2& 64  & 0.304183 \\
-3& 128 & 0.304020 \\
-4& 256 & 0.303870 \\
-5& 512 & 0.300294 \\
-6 & 1024 &0.286491 \\
-\end{tabular}
-\caption{Average time for 10 passes versus threads per block}
-\end{table}
+\section {Question 4}
 
-The consequent plot: \textbf{Figure 2}
+Here, we implement tiling for the case of similar square matrices. \\
 
-\begin{figure}[ht]
-\centering
-%%\includegraphics[angle=0,width=0.7\textwidth]{Figure_2.png}
-\caption{Average Runtime versus Threads per Block for \textbf{GTX 1080 Ti}}
-\end{figure}
+We compare the performance boost versus question 1.
 
-Hence, \textbf{optimal no of threads per block} is \textbf{1024}.\\
+\begin{lstlisting}[numbers = none]
+Time spent in col maj 4015.230225
+\end{lstlisting} 
 
-\subsection{Reasoning}
-
-The optimal threads per block may not be upper bounded for this low intensity (operational), and hence, using the maximum possible number of threads per block is optimal.
-\section {Question 5}
-
-Here, we empirically investigate the dependence of run-time on the number of operations per thread.
+The matrix multiplication takes just 4 seconds, a major improvement over 28 seconds previously. Note that this is due to lower latency in data access and the problem of DRAM locality being efficiently addressed by tiling.
 
 \subsection{Code Changes} 
 \begin{lstlisting}
-	__global__ void VecAdd(float* A, float* B, float* C, int N){
-      // Host code
-      int j;
-    int i = blockDim.x * blockIdx.x + threadIdx.x;
-    if (i < N_op){
-        for (j=0;j<op_loop;j++)
-            C[i*op_loop+j] = A[i*op_loop+j] + B[i*op_loop+j];
+__global__ void MatrixMulKernel_col_maj(double* M, double* N, double* Q, int Width) { 
+    //extern __shared__ double buffer[];
+    //double *ds_M = &buffer[0];
+    //double *ds_N = &buffer[Width*Width];
+
+    __shared__ double ds_M[TILE_WIDTH][TILE_WIDTH];
+    __shared__ double ds_N[TILE_WIDTH][TILE_WIDTH];
+
+    // Generate IDs
+    double Pvalue=0;
+    int bx = blockIdx.x;  int by = blockIdx.y;
+    int tx = threadIdx.x; int ty = threadIdx.y;
+    int Row = by * blockDim.y + ty;
+    int Col = bx * blockDim.x + tx;
+
+    
+    // Loop over the M and N tiles required to compute the P element
+    for (int p = 0; p < (Width)/TILE_WIDTH; ++p) {
+        if ( (Row < Width) && (tx + p*TILE_WIDTH) < Width){
+        // Collaborative loading of M and N tiles into shared memory
+        ds_M[ty][tx] = M[Row*Width + p*TILE_WIDTH+tx];
+        }
+        else{
+            ds_M[ty][tx]=0.0;
+        }
+        if ( (Col < Width) && (ty + p*TILE_WIDTH) < Width){
+        ds_N[ty][tx] = N[(p*TILE_WIDTH+ty)*Width + Col];
+        }
+        else{
+            ds_N[ty][tx]=0.0;
+        }
+        __syncthreads();
+
+        for (int i = 0; i < TILE_WIDTH; ++i){
+            Pvalue += ds_M[ty][i] * ds_N[i][tx];
+            
+        }
+        __syncthreads();
+        
     }
+    
+    if ((Row < Width) && (Col < Width)){
+    Q[Row*Width+Col] = Pvalue;
     }
-   // Array of op's to try//
-   for (op_loop_ii=0;op_loop_ii<10;op_loop_ii++){
-        op_loop_array[op_loop_ii]=pow(2,op_loop_ii);
-    }
-// Run kernel over these ops and average each run //
-cudaEventRecord(start, 0);
-VecAdd<<<blocksPerGrid, threadsPerBlock>>>(d_A,d_B, d_C, N);
-cudaEventRecord(stop, 0);
-cudaEventSynchronize(stop);
-cudaEventElapsedTime(&time_spent, start, stop);
-time_spent=time_spent/(avg_loop-1)*10;
+}
 \end{lstlisting} \\
 
-\subsection{Run-Times}
 
-\textbf{Table 3} contains the relevant logs.
+\section {Question 5}
 
-\begin{table}[ht]
-\footnotesize
-\centering
-\begin{tabular}{r||rrr}
- SI (vector addition of $2^{15}$ size) & Ops per loop (powers of 2) & Average GPU run-time (for 10 runs)  \\ 
- \hline \hline
-1 & 1 &  0.298492 \\ 
-2& 2  & 0.349331 \\
-3& 4 & 0.296480 \\
-4& 8 & 0.340138 \\
-5& 16 & 0.374680 \\
-6 & 32 &0.454981 \\
-7 & 64 &0.570481 \\
-8 & 128 &0.864831 \\
-\end{tabular}
-\caption{Average time for 10 passes versus ops per thread}
-\end{table}
+We vary the tile size from $4*4$ to $32*32$ to  find the most optimal tile size. Considering that the \textbf{GTX 1080 Ti} can fit 1024 threadsPerBlock, we expect $32$ to be the optimal tilesize. \\
 
-The consequent plot: \textbf{Figure 3} \\
+Note that tilesize being varied independently of the blocksize, ... ie, having a block size as a multiple of the tile size doesnot make a difference as it now effectively acts a bigger tile. Hence the only independent parameter here is the tilesize. \\
 
-\begin{figure}[ht]
-\centering
-%%\includegraphics[angle=0,width=0.7\textwidth]{Figure_3.png}
-\caption{Average Runtime versus Ops per Thread for \textbf{GTX 1080 Ti}}
-\end{figure}
-
-Hence, \textbf{optimal no of ops per thread} is \textbf{4}.\\
-
-\subsection{Reasoning}
-
-The optimal operations per block is dependent on the level of SIMD parallelism a single thread may be able to achieve. With an optimal of \textbf{4}, it is possible that the device has over \textbf{8 ALU's} per thread-context. \\
-
-\section {Question 6 and 7}
-Again, empirically, we observe the changes in run-time per vector size of the random vectors being operated upon.
+Again, empirically, we observe that $32 *32$ is the most optimal tile size. This makes sense, since there are greater advantages with a larger tile size, and the only upperbound being the shared memory and the number of threadsPerBlock.
  
  \subsection{Run-Times}
  
- No major code changes here, besides varying the vector sizes given these optimal \textit{Threads per Block} and \textit{operations per thread}. \\
-
-\begin{table}[ht]
-\footnotesize
-\centering
-\begin{tabular}{r||rrr}
- SI (vector addition of $2^{15}$ size) & Vector Size (powers of 2) & Average GPU run-time ( averaged over 1000 runs)  \\ 
- \hline \hline
-1 & $2^{15}$ &  0.032892 \\ 
-2& $2^{16}$   & 0.032452 \\
-3&  $2^{17}$ & 0.044452 \\
-4&  $2^{18}$ & 0.101014 \\
-5&  $2^{19}$ & 0.198954 \\
-6 &  $2^{20}$ &0.341814 \\
-\end{tabular}
-\caption{Average time for single pass versus Vector Size}
-\end{table}
+ No major code changes here, besides varying the tile sizes given these optimal \textit{Threads per Block} .\\
  
- Consequent plot: \textbf{Figure 4}
+ Corresponding plot in \textbf{Figure-2}.
  
  \begin{figure}[ht]
 \centering
-%%\includegraphics[angle=0,width=0.7\textwidth]{Figure_4.png}
-\caption{Average Runtime versus Vector Size for \textbf{GTX 1080 Ti}}
+\includegraphics[angle=0,width=0.7\textwidth]{q5.png}
+\caption{Average Runtime versus Tile Size for \textbf{GTX 1080 Ti}}
 \end{figure}
 
+\section{Question 6}
 
-\subsection{Reasoning}
+We generalise tiling for rectangular matrices. The changes made are primarily by matching corresponding row-column sizes as well as the correct boundaries for each tile and index.
 
-The variation of runtimes with size is not linear $O(n)$ as would have been expected of a CPU, but is more or less constant upto $2^{18}$ as a vector size. Post this, it is possible that the size no longer allows the same degree of parallelism with respect to caching, Grid-to-thread transfer, etc.
- 
+This is more evident in the code snippet below. We try this out for a matrix multiplication of $4096 * 8192$ times $8192*16384$, and report the following runtime.
+
+Note that this is slightly slower than 1 due to more matrix ops. Further if conditions are put in place to handle the externalities. This therefore can generalise to arbitrary multiplicand sizes.
+
+\subsection{Code Changes} 
+
+\begin{lstlisting}
+__global__ void MatrixMulKernel_col_maj(double* M, double* N, double* Q, int M_r, int N_c, int M_c) { 
+    //extern __shared__ double buffer[];
+    //double *ds_M = &buffer[0];
+    //double *ds_N = &buffer[Width*Width];
+
+    __shared__ double ds_M[TILE_WIDTH][TILE_WIDTH];
+    __shared__ double ds_N[TILE_WIDTH][TILE_WIDTH];
+
+    // Generate IDs
+    double Pvalue=0;
+    int bx = blockIdx.x;  int by = blockIdx.y;
+    int tx = threadIdx.x; int ty = threadIdx.y;
+    int Row = by * blockDim.y + ty;
+    int Col = bx * blockDim.x + tx;
+
+    
+    // Loop over the M and N tiles required to compute the P element
+    for (int p = 0; p < (M_c)/TILE_WIDTH; ++p) {
+        if ( (Row < M_r) && (tx + p*TILE_WIDTH) < M_c){
+        // Collaborative loading of M and N tiles into shared memory
+        ds_M[ty][tx] = M[Row*M_c + p*TILE_WIDTH+tx];
+        }
+        else{
+            ds_M[ty][tx]=0.0;
+        }
+        if ( (Col < N_c) && (ty + p*TILE_WIDTH) < M_c){
+        ds_N[ty][tx] = N[(p*TILE_WIDTH+ty)*N_c + Col];
+        }
+        else{
+            ds_N[ty][tx]=0.0;
+        }
+        __syncthreads();
+
+        for (int i = 0; i < TILE_WIDTH; ++i){
+            Pvalue += ds_M[ty][i] * ds_N[i][tx];
+            
+        }
+        __syncthreads();
+        
+    }
+    
+    if ((Row < M_r) && (Col < N_c)){
+    Q[Row*N_c+Col] = Pvalue;
+    }
+}
+\end{lstlisting} \\
+
+\section{Question 7}
+
+We use a similar structure as \textbf{Question 5} to find the most optimal configuration , here, dictated by the tile size. An array stores the time taken and empirically finds the best configuration.\\
+
+We find the following configuration: \\
+
+\begin{lstlisting}[numbers = none]
+Optimal time is 32806.507812, threads per block is 32 x 32, tile size is 32 x 32 blocks per grid is 257 x 1025.
+\end{lstlisting} 
+
+\section{References}
+\begin{itemize}
+\item Classroom lectures and Slides.
+\item CUDA Dev Documentation.
+\end{itemize}
+
