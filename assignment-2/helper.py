@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 xx=np.arange(2,6)
-nn=[64357.871094,32513.554688,16457.830078,12096.892578]/1000.0
-nn=np.array(nn)
+nn=[64357.871094,32513.554688,16457.830078,12096.892578]
+nn=np.array(nn)/1000.0
 plt.plot(xx,nn,linestyle='--', marker='o', color='b')
 
 for x,n in zip(xx,nn):
