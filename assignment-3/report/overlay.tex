@@ -1,0 +1,51 @@
+%
+\documentclass[12pt, oneside]{article}
+\usepackage[margin=0.85in]{geometry}
+\linespread{1}
+\usepackage{xcolor}
+\usepackage[colorlinks=false, linkbordercolor=white, citebordercolor=white, 
+    filebordercolor=white, urlbordercolor=white]{hyperref}
+    
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{minted}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyhead{}
+\fancyhead[L]{CS6023 GPU Programming} 
+\fancyhead[R]{Varun EE16B068} 
+\fancyfoot{}
+\fancyfoot[C]{\thepage}
+
+\usepackage{titlesec}
+\titlespacing{\chapter}{0pt}{*4}{*2.5}
+
+\titleformat{\chapter}{\normalfont\huge\bf}{\thechapter}{20pt}{\huge\bf}
+
+
+
+\usepackage{listings}
+\definecolor{dgray}{gray}{0.35} 
+\definecolor{lgray}{gray}{0.95} 
+
+\lstset{ 
+language=Python, 
+basicstyle=\ttfamily\small, 
+backgroundcolor=\color{lgray},
+commentstyle=\ttfamily\small\itshape\color{dgray}, 
+showstringspaces=false, 
+numbers=left, 
+numberstyle=\ttfamily\small, 
+stepnumber=1, 
+firstnumber=last, 
+breaklines=T} 
+
+\begin{document}
+
+\input{assignment-2/report/title-page.tex}
+\addtocontents{toc}{~\hfill\textbf{Page}\par}
+\input{assignment-2/report/contents.tex}
+\end{document}

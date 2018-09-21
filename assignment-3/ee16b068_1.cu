@@ -2,26 +2,9 @@
 #include <stdio.h>
 #define MAXWORDS 20000
 
-void fill_matrix(double *mat, unsigned numRows, unsigned numCols)
-{
-    for(unsigned i=0; i < numRows; i++)
-       for(unsigned j=0; j < numCols; j++)
-       {
-         mat[i*numCols + j] = i*2.1f + j*3.2f;
-       }
+bool checkWord(word){
+    // Check if word meets, else pre-process
 }
-
-void print_matrix_to_file(double *mat, unsigned numRows, unsigned numCols)
-{
-  const char *fname = "assignment2_1_out";
-  FILE *f = fopen(fname, "w");
-  for(unsigned i=0; i < numRows; i++)
-  {
-     for(unsigned j=0; j < numCols; j++)
-     fprintf(f,"%4.4f ", mat[i*numCols + j]);
-     fprintf(f,"\n");
-}
-fclose(f); }
 
 __global__ void MatrixMulKernel_col_maj(double* M, double* N, double* P, int Width) { 
     // Calculate the row index of the P element and M
