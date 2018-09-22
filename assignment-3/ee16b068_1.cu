@@ -1,103 +1,172 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
+#include <string.h>
+
 #define MAXWORDS 20000
 
-bool checkWord(word){
+int checkWord(char* word,char* words,int* count_array,int offset){
     // Check if word meets, else pre-process
+    // Args:
+    // word >> word of consideration from fscanf
+    // words >> Array where, every 20 chars is a word
+    // offset >> Which entry to start writting at (modulo 20)
+    // Returns:
+    // new offset
+    // Modifies:
+    // words
+    int loop=0;
+    int count=0;
+
+    for (loop=0;loop<strlen(word)-1;loop++)
+    {
+       
+       if (word[loop]=='-')
+       {
+          words[offset*20+loop]=0;
+          printf("Word %s \n",&words[offset*20]);
+          offset+=1;
+          count_array[offset]=count;
+          count=0;
+        }
+       else{
+          /* Copy character */
+          words[offset*20+loop]=word[loop];
+          count+=1;
+       }
+    }
+
+    if (ispunct((unsigned char)word[strlen(word)-1]))
+       {
+          /* Skip this character */
+          words[offset*20+strlen(word)-1]=0;
+          count_array[offset]=count;
+          offset+=1;
+       }
+    else{
+        words[offset*20+strlen(word)-1]=word[strlen(word)-1];
+        count+=1;
+        words[offset*20+strlen(word)]=0;
+        count_array[offset]=count;
+        offset+=1;
+    }
+    return offset;
+
 }
 
-__global__ void windowGram(char** word){
+__global__ void nCountGram(int* d_count, int* d_hist, int N){
+    extern __shared__ int buffer[];
+    unsigned int *temp = &buffer[0];
+    //__shared__ unsigned int temp[1024];
 
+    // Helper var
+    int index,j;
+
+    for (p=0;p<pow(20,N)/1024+1;p++){
+    temp[threadIdx.x + p*1024] = 0;
+    }
+    __syncthreads();
+
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int offset = blockDim.x * gridDim.x;
+
+    while (i < pow(20,N))
+    {
+        // Since 0,0 is invalid
+        index=-1
+        for (j = 0;j < N; j++){
+            index+=d_count[i+j]*pow(20,N-j-1)
+        }
+    atomicAdd( &temp[index], 1);
+    i += offset;
+    }
+
+__syncthreads();
+
+for (p=0;p<pow(20,N)/1024+1;p++){
+    atomicAdd( &(d_hist[threadIdx.x + p*1024]), temp[threadIdx.x + p*1024] );
+    }
 }
 
 int main(int argc,char **argv) {
-    
-    //size_t size = N *N* sizeof(double);
+    // Helper vars
+    int loop, loop1;
+    float time_spent;
 
     int N = atoi(argv[1]);
     char *filename = argv[2];
+    int count_array[MAXWORDS];
     char words[MAXWORDS * 20];
+
     // For calculating N-count-grams
     // Filename: shaks.txt
     // Stores all words in 1D array
     // Single word length is bounded by 20
     // Take input string into this
-    char curWord[40];
+    char curWord[20];
     int totalWordCount = 0;
-    FILE *ipf = fopen(filename, “r”);
-    while (fscanf(ipf, “%s ”, curWord) != EOF
-                    // Count of number of words read
-    && totalWordCount < MAXWORDS) {
-        //checkWord(curWord, ...);
-        printf("Current word %s \n",curWord);
-        totalWordCount += 1;
+    FILE *ipf;
+    ipf = fopen(filename, "r");
+    while (fscanf(ipf, "%s ", curWord) != EOF && totalWordCount < MAXWORDS) {
+         // Count of number of words read
+        printf("Curr word %s \n",curWord);
+        totalWordCount=checkWord(curWord,words,count_array,totalWordCount);
+        //printf("Current word %s \n",curWord);
+        //printf("Word count %d \n",totalWordCount);
     }
     fclose(ipf);
+
+    for (loop=0;loop<totalWordCount;loop++){
+        printf("Word %d %s \n",loop,&words[20*loop]);
+        printf("Char count %d \n",count_array[loop]);
+    }
     // Check for word properties
     // and update ‘words[]’ array.
     // Modify this section according
     // to below mentioned properties
 
-    // cudaMalloc(&d_matC, size);
+    //Create CPU arrays (hist)
+    int* h_A = (int*)malloc(pow(20,N)*sizeof(int));
 
-    // //GPU timing
-    // cudaEvent_t start, stop;
-    // cudaEventCreate(&start);
-    // cudaEventCreate(&stop);
+    // Create GPU arrays, Copy count array from host memory to device memory
+    int* d_count; cudaMalloc(&d_count, MAXWORDS*sizeof(int));
+    cudaMemcpy(d_count, count_array, MAXWORDS,cudaMemcpyHostToDevice);
+    int* d_hist; cudaMalloc(&d_hist, pow(20,N)*sizeof(int));
 
-    // // Copy vectors from host memory to device memory
-    // cudaMemcpy(d_matA, h_matA, size,cudaMemcpyHostToDevice);
-    // cudaMemcpy(d_matB, h_matB, size,cudaMemcpyHostToDevice);
+    // GPU timing
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
 
     // // Invoke kernel
-    // dim3 threadsPerBlock = (16,16);
-    // dim3 blocksPerGrid ((N + threadsPerBlock.x - 1) /threadsPerBlock.x,(N + threadsPerBlock.y - 1) /threadsPerBlock.y);
+    dim threadsPerBlock = 1024;
+    dim blocksPerGrid ((pow(20,N) + threadsPerBlock - 1) /threadsPerBlock);
 
-    // cudaEventRecord(start, 0);
-    // MatrixMulKernel_col_maj<<<blocksPerGrid, threadsPerBlock>>>(d_matA,d_matB, d_matC, N);
-    // cudaEventRecord(stop, 0);
-    // cudaEventSynchronize(stop);
-    // cudaEventElapsedTime(&time_spent, start, stop);
-    // printf("\nTime spent in col maj %f\n",time_spent);
+    cudaEventRecord(start, 0);
+    nCountGram<<<blocksPerGrid, threadsPerBlock, pow(N,20)*sizeof(int)>>>(d_count,d_hist, d_matC, N);
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&time_spent, start, stop);
+    printf("\nTime spent in col maj %f\n",time_spent);
 
-    // // h_C contains the result in host memory
-    // cudaMemcpy(h_matC, d_matC, size,cudaMemcpyDeviceToHost);
+    // h_hist contains the result in host memory
+    cudaMemcpy(h_hist, d_hist, pow(20,N)*sizeof(int),cudaMemcpyDeviceToHost);
 
-    // printf("\n\nMatrix C via col major (first 10*10 outputs)\n");
-    // for(loop1 = 0; loop1 < 10; loop1++){
-    //     for (loop2=0;loop2 < 10; loop2++)
-    //         printf("%f ", *(h_matC + N*loop1 + loop2));
-    // }
+    printf("\n\n Histogram for N of value %d, total number of words %d \n",N,totalWordCount);
+    for(loop = 0; loop < pow(20,N); loop++){
+        printf("Value ");
+         for (loop1=1;loop1 < N; loop2++)
+             printf("%d ", loop/pow(20,N-loop1-1));
 
-    // cudaEventRecord(start, 0);
-    // MatrixMulKernel_row_maj<<<blocksPerGrid, threadsPerBlock>>>(d_matA,d_matB, d_matC, N);
-    // cudaEventRecord(stop, 0);
-    // cudaEventSynchronize(stop);
-    // cudaEventElapsedTime(&time_spent, start, stop);
-    // printf("\nTime spent in row maj %f\n",time_spent);
+        printf(" Count: %d \n",h_hist[loop]);
+     }
 
-    // // h_C contains the result in host memory
-    // cudaMemcpy(h_matC, d_matC, size,cudaMemcpyDeviceToHost);
+    // Free device memory
+    cudaFree(d_count);
+    cudaFree(d_hist);
 
-    // printf("\n\nMatrix C via row major (first 10*10 outputs)\n");
-    // for(loop1 = 0; loop1 < 10; loop1++){
-    //     for (loop2=0;loop2 < 10; loop2++)
-    //         printf("%f ", *(h_matC + N*loop1 + loop2));
-    // }
-      
-
-    // // Log outputs
-    // printf("\nWritting to file assignment_2_1_out as Mat C");
-    // print_matrix_to_file(h_matC,N,N);
-
-    // // Free device memory
-    // cudaFree(d_matA);
-    // cudaFree(d_matB);
-    // cudaFree(d_matC);
-
-    // // Free host memory
-    // free(h_matA);
-    // free(h_matB);
-    // free(h_matC);
+    // Free host memory
+    free(h_hist);
+    free(count_array);
     return 0;
 }
