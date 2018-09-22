@@ -165,7 +165,7 @@ int main(int argc,char **argv) {
     for(loop = 0; loop < pow(20,N); loop++){
         printf("Value ");
          for (loop1=1;loop1 < N; loop1++)
-             printf("%u ", loop/pow(20,N-loop1-1));
+             printf("%u ", (unsigned int)loop/pow(20,N-loop1-1));
 
         printf(" Count: %u \n",h_hist[loop]);
      }
@@ -176,6 +176,5 @@ int main(int argc,char **argv) {
 
     // Free host memory
     free(h_hist);
-    free(count_array);
     return 0;
 }
