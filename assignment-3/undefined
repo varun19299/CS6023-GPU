@@ -54,14 +54,15 @@ int checkWord(char* word,char* words,int* count_array,int offset){
 
 }
 
-__global__ void windowGram(int* count, int* window_count){
+__global__ void nCountGram(int* d_count, int* d_hist, int N){
     tx=threadId.x
     printf("");
 }
 
 int main(int argc,char **argv) {
+    // Helper vars
     int loop;
-    //size_t size = N *N* sizeof(double);
+    float time_spent;
 
     int N = atoi(argv[1]);
     char *filename = argv[2];
@@ -96,27 +97,26 @@ int main(int argc,char **argv) {
     // Modify this section according
     // to below mentioned properties
 
-    // cudaMalloc(&d_matC, size);
+    // Create GPU arrays, Copy count array from host memory to device memory
+    cudaMalloc(&d_count, MAXWORDS);
+    cudaMemcpy(d_count, count_array, MAXWORDS,cudaMemcpyHostToDevice);
+    cudaMalloc(&d_hist, pow(20,N));
 
-    // //GPU timing
-    // cudaEvent_t start, stop;
-    // cudaEventCreate(&start);
-    // cudaEventCreate(&stop);
-
-    // // Copy vectors from host memory to device memory
-    // cudaMemcpy(d_matA, h_matA, size,cudaMemcpyHostToDevice);
-    // cudaMemcpy(d_matB, h_matB, size,cudaMemcpyHostToDevice);
+    // GPU timing
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
 
     // // Invoke kernel
-    // dim3 threadsPerBlock = (16,16);
-    // dim3 blocksPerGrid ((N + threadsPerBlock.x - 1) /threadsPerBlock.x,(N + threadsPerBlock.y - 1) /threadsPerBlock.y);
+    dim threadsPerBlock = 1024;
+    dim blocksPerGrid ((pow(20,N) + threadsPerBlock - 1) /threadsPerBlock);
 
-    // cudaEventRecord(start, 0);
+    cudaEventRecord(start, 0);
     // MatrixMulKernel_col_maj<<<blocksPerGrid, threadsPerBlock>>>(d_matA,d_matB, d_matC, N);
-    // cudaEventRecord(stop, 0);
-    // cudaEventSynchronize(stop);
-    // cudaEventElapsedTime(&time_spent, start, stop);
-    // printf("\nTime spent in col maj %f\n",time_spent);
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&time_spent, start, stop);
+    printf("\nTime spent in col maj %f\n",time_spent);
 
     // // h_C contains the result in host memory
     // cudaMemcpy(h_matC, d_matC, size,cudaMemcpyDeviceToHost);
