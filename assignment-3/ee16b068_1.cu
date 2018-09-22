@@ -135,7 +135,7 @@ int main(int argc,char **argv) {
     // to below mentioned properties
 
     //Create CPU arrays (hist)
-    int* h_hist = (unsigned int*)malloc(pow(20,N)*sizeof(unsigned int));
+    unsigned int* h_hist = (unsigned int*)malloc(pow(20,N)*sizeof(unsigned int));
 
     // Create GPU arrays, Copy count array from host memory to device memory
     int* d_count; cudaMalloc(&d_count, MAXWORDS*sizeof(int));
