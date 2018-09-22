@@ -135,7 +135,7 @@ int main(int argc,char **argv) {
     // to below mentioned properties
 
     //Create CPU arrays (hist)
-    int* h_hist = (int*)malloc(pow(20,N)*sizeof(int));
+    int* h_hist = (unsigned int*)malloc(pow(20,N)*sizeof(unsigned int));
 
     // Create GPU arrays, Copy count array from host memory to device memory
     int* d_count; cudaMalloc(&d_count, MAXWORDS*sizeof(int));
@@ -165,9 +165,9 @@ int main(int argc,char **argv) {
     for(loop = 0; loop < pow(20,N); loop++){
         printf("Value ");
          for (loop1=1;loop1 < N; loop1++)
-             printf("%d ", loop/pow(20,N-loop1-1));
+             printf("%u ", loop/pow(20,N-loop1-1));
 
-        printf(" Count: %d \n",h_hist[loop]);
+        printf(" Count: %u \n",h_hist[loop]);
      }
 
     // Free device memory
