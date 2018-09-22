@@ -73,7 +73,7 @@ __global__ void nCountGram(int* d_count, int* d_hist, int N){
     while (i < pow(20,N))
     {
         // Since 0,0 is invalid
-        index=-1
+        index=-1;
         for (j = 0;j < N; j++){
             index+=d_count[i+j]*pow(20,N-j-1);
         }
@@ -140,7 +140,7 @@ int main(int argc,char **argv) {
 
     // // Invoke kernel
     dim3 threadsPerBlock = 1024;
-    dim3 blocksPerGrid ((pow(20,N) + threadsPerBlock - 1) /threadsPerBlock);
+    dim3 blocksPerGrid ((pow(20,N) + threadsPerBlock.x - 1) /threadsPerBlock.x);
 
     cudaEventRecord(start, 0);
     nCountGram<<<blocksPerGrid, threadsPerBlock, pow(N,20)*sizeof(unsigned int)>>>(d_count,d_hist, N);
