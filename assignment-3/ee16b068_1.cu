@@ -166,7 +166,7 @@ int main(int argc,char **argv) {
         printf("Value ");
         a=loop/(unsigned int)pow(20,N-1);
         b=loop;
-         for (loop1=1;loop1 < N; loop1++)
+         for (loop1=1;loop1 < N+1; loop1++)
             printf("%d  ", a);
             a=b-a*(unsigned int)pow(20,N-loop1);
             b=a;
