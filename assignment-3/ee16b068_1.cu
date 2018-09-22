@@ -126,7 +126,7 @@ int main(int argc,char **argv) {
     // to below mentioned properties
 
     //Create CPU arrays (hist)
-    int* h_A = (int*)malloc(pow(20,N)*sizeof(int));
+    int* h_hist = (int*)malloc(pow(20,N)*sizeof(int));
 
     // Create GPU arrays, Copy count array from host memory to device memory
     int* d_count; cudaMalloc(&d_count, MAXWORDS*sizeof(int));
@@ -155,7 +155,7 @@ int main(int argc,char **argv) {
     printf("\n\n Histogram for N of value %d, total number of words %d \n",N,totalWordCount);
     for(loop = 0; loop < pow(20,N); loop++){
         printf("Value ");
-         for (loop1=1;loop1 < N; loop2++)
+         for (loop1=1;loop1 < N; loop1++)
              printf("%d ", loop/pow(20,N-loop1-1));
 
         printf(" Count: %d \n",h_hist[loop]);
