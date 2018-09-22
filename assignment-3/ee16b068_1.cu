@@ -165,7 +165,7 @@ int main(int argc,char **argv) {
     for(loop = 0; loop < pow(20,N); loop++){
         printf("Value ");
          for (loop1=1;loop1 < N; loop1++)
-             printf("%u ", (unsigned int)loop/pow(20,N-loop1-1));
+             printf("%u  ", loop/(unsigned int)pow(20,N-loop1-1));
 
         printf(" Count: %u \n",h_hist[loop]);
      }
