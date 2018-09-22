@@ -64,7 +64,7 @@ __global__ void nCountGram(int* d_count, int* d_hist, int N){
 
     int a;
     for (p=0;p<N;p++){
-        a*=20
+        a*=20;
     }
 
     int b;
