@@ -62,7 +62,14 @@ __global__ void nCountGram(int* d_count, int* d_hist, int N){
     // Helper var
     int index, j, p;
 
-    for (p=0;p<pow(20,N)/1024+1;p++){
+    int a;
+    for (p=0;p<N;p++){
+        a*=20
+    }
+
+    int b;
+
+    for (p=0;p<a/1024+1;p++){
     temp[threadIdx.x + p*1024] = 0;
     }
     __syncthreads();
@@ -70,12 +77,14 @@ __global__ void nCountGram(int* d_count, int* d_hist, int N){
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int offset = blockDim.x * gridDim.x;
 
-    while (i < pow(20,N))
+    while (i < a)
     {
         // Since 0,0 is invalid
         index=-1;
+        b=a/20;
         for (j = 0;j < N; j++){
-            index+=d_count[i+j]*pow(20,N-j-1);
+            index+=d_count[i+j]*b;
+            b/=20;
         }
     atomicAdd( &temp[index], 1);
     i += offset;
@@ -83,7 +92,7 @@ __global__ void nCountGram(int* d_count, int* d_hist, int N){
 
     __syncthreads();
 
-    for (p=0;p<pow(20,N)/1024+1;p++){
+    for (p=0;p<a/1024+1;p++){
         atomicAdd( &(d_hist[threadIdx.x + p*1024]), temp[threadIdx.x + p*1024] );
         }
 }
