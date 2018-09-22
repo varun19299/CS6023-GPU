@@ -162,7 +162,7 @@ int main(int argc,char **argv) {
     cudaMemcpy(h_hist, d_hist, (unsigned int)pow(20,N)*sizeof(unsigned int),cudaMemcpyDeviceToHost);
 
     printf("\n\n Histogram for N of value %d, total number of words %d \n",N,totalWordCount);
-    for(loop = 0; loop < (unsigned int)pow(20,N); loop++){
+    for(loop = 1; loop < (unsigned int)pow(20,N)+1; loop++){
         a=loop/(unsigned int)pow(20,N-1);
         b=loop;
         printf("Value %d ",a);
