@@ -163,11 +163,13 @@ int main(int argc,char **argv) {
 
     printf("\n\n Histogram for N of value %d, total number of words %d \n",N,totalWordCount);
     for(loop = 0; loop < pow(20,N); loop++){
+        if (h_hist[loop]>0){
         printf("Value ");
          for (loop1=1;loop1 < N; loop1++)
              printf("%u  ", loop/(unsigned int)pow(20,N-loop1-1));
 
         printf(" Count: %u \n",h_hist[loop]);
+        }
      }
 
     // Free device memory
