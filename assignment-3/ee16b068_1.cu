@@ -131,7 +131,7 @@ int main(int argc,char **argv) {
     // Create GPU arrays, Copy count array from host memory to device memory
     int* d_count; cudaMalloc(&d_count, MAXWORDS*sizeof(int));
     cudaMemcpy(d_count, count_array, MAXWORDS,cudaMemcpyHostToDevice);
-    int* d_hist; cudaMalloc(&d_hist, pow(20,N)*sizeof(int));
+    int* d_hist; cudaMalloc(&d_hist, pow(20,N)*sizeof(unsigned int));
 
     // GPU timing
     cudaEvent_t start, stop;
@@ -143,14 +143,14 @@ int main(int argc,char **argv) {
     dim blocksPerGrid ((pow(20,N) + threadsPerBlock - 1) /threadsPerBlock);
 
     cudaEventRecord(start, 0);
-    nCountGram<<<blocksPerGrid, threadsPerBlock, pow(N,20)*sizeof(int)>>>(d_count,d_hist, d_matC, N);
+    nCountGram<<<blocksPerGrid, threadsPerBlock, pow(N,20)*sizeof(unsigned int)>>>(d_count,d_hist, d_matC, N);
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&time_spent, start, stop);
     printf("\nTime spent in col maj %f\n",time_spent);
 
     // h_hist contains the result in host memory
-    cudaMemcpy(h_hist, d_hist, pow(20,N)*sizeof(int),cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_hist, d_hist, pow(20,N)*sizeof(unsigned int),cudaMemcpyDeviceToHost);
 
     printf("\n\n Histogram for N of value %d, total number of words %d \n",N,totalWordCount);
     for(loop = 0; loop < pow(20,N); loop++){
