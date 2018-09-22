@@ -55,12 +55,12 @@ int checkWord(char* word,char* words,int* count_array,int offset){
 }
 
 __global__ void nCountGram(int* d_count, int* d_hist, int N){
-    extern __shared__ int buffer[];
+    extern __shared__ unsigned int buffer[];
     unsigned int *temp = &buffer[0];
     //__shared__ unsigned int temp[1024];
 
     // Helper var
-    int index,j;
+    int index, j, p;
 
     for (p=0;p<pow(20,N)/1024+1;p++){
     temp[threadIdx.x + p*1024] = 0;
@@ -75,17 +75,17 @@ __global__ void nCountGram(int* d_count, int* d_hist, int N){
         // Since 0,0 is invalid
         index=-1
         for (j = 0;j < N; j++){
-            index+=d_count[i+j]*pow(20,N-j-1)
+            index+=d_count[i+j]*pow(20,N-j-1);
         }
     atomicAdd( &temp[index], 1);
     i += offset;
     }
 
-__syncthreads();
+    __syncthreads();
 
-for (p=0;p<pow(20,N)/1024+1;p++){
-    atomicAdd( &(d_hist[threadIdx.x + p*1024]), temp[threadIdx.x + p*1024] );
-    }
+    for (p=0;p<pow(20,N)/1024+1;p++){
+        atomicAdd( &(d_hist[threadIdx.x + p*1024]), temp[threadIdx.x + p*1024] );
+        }
 }
 
 int main(int argc,char **argv) {
@@ -139,11 +139,11 @@ int main(int argc,char **argv) {
     cudaEventCreate(&stop);
 
     // // Invoke kernel
-    dim threadsPerBlock = 1024;
-    dim blocksPerGrid ((pow(20,N) + threadsPerBlock - 1) /threadsPerBlock);
+    dim3 threadsPerBlock = 1024;
+    dim3 blocksPerGrid ((pow(20,N) + threadsPerBlock - 1) /threadsPerBlock);
 
     cudaEventRecord(start, 0);
-    nCountGram<<<blocksPerGrid, threadsPerBlock, pow(N,20)*sizeof(unsigned int)>>>(d_count,d_hist, d_matC, N);
+    nCountGram<<<blocksPerGrid, threadsPerBlock, pow(N,20)*sizeof(unsigned int)>>>(d_count,d_hist, N);
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&time_spent, start, stop);
