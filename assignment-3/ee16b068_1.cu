@@ -135,12 +135,12 @@ int main(int argc,char **argv) {
     // to below mentioned properties
 
     //Create CPU arrays (hist)
-    unsigned int* h_hist = (unsigned int*)malloc(pow(20,N)*sizeof(unsigned int));
+    unsigned int* h_hist = (unsigned int*)malloc((unsigned int)pow(20,N)*sizeof(unsigned int));
 
     // Create GPU arrays, Copy count array from host memory to device memory
     int* d_count; cudaMalloc(&d_count, MAXWORDS*sizeof(int));
-    cudaMemcpy(d_count, count_array, MAXWORDS,cudaMemcpyHostToDevice);
-    int* d_hist; cudaMalloc(&d_hist, pow(20,N)*sizeof(unsigned int));
+    cudaMemcpy(d_count, count_array, MAXWORDS*sizeof(int),cudaMemcpyHostToDevice);
+    int* d_hist; cudaMalloc(&d_hist, (unsigned int)pow(20,N)*sizeof(unsigned int));
 
     // GPU timing
     cudaEvent_t start, stop;
@@ -152,14 +152,14 @@ int main(int argc,char **argv) {
     dim3 blocksPerGrid ((pow(20,N) + threadsPerBlock.x - 1) /threadsPerBlock.x);
 
     cudaEventRecord(start, 0);
-    nCountGram<<<blocksPerGrid, threadsPerBlock, pow(N,20)*sizeof(unsigned int)>>>(d_count,d_hist, N);
+    nCountGram<<<blocksPerGrid, threadsPerBlock, (unsigned int)pow(N,20)*sizeof(unsigned int)>>>(d_count,d_hist, N);
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&time_spent, start, stop);
     printf("\nTime spent in col maj %f\n",time_spent);
 
     // h_hist contains the result in host memory
-    cudaMemcpy(h_hist, d_hist, pow(20,N)*sizeof(unsigned int),cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_hist, d_hist, (unsigned int)pow(20,N)*sizeof(unsigned int),cudaMemcpyDeviceToHost);
 
     printf("\n\n Histogram for N of value %d, total number of words %d \n",N,totalWordCount);
     for(loop = 0; loop < pow(20,N); loop++){
