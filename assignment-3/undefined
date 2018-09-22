@@ -1,0 +1,161 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <ctype.h>
+#include <string.h>
+
+#define MAXWORDS 20000
+
+int checkWord(char* word,char* words,int* count_array,int offset){
+    // Check if word meets, else pre-process
+    // Args:
+    // word >> word of consideration from fscanf
+    // words >> Array where, every 20 chars is a word
+    // offset >> Which entry to start writting at (modulo 20)
+    // Returns:
+    // new offset
+    // Modifies:
+    // words
+    int loop=0;
+    int count=0;
+
+    for (loop=0;loop<strlen(word)-1;loop++)
+    {
+       
+       if (word[loop]=='-')
+       {
+          words[offset*20+loop]=0;
+          printf("Word %s \n",&words[offset*20]);
+          offset+=1;
+          count_array[offset]=count;
+          count=0;
+        }
+       else{
+          /* Copy character */
+          words[offset*20+loop]=word[loop];
+          count+=1;
+       }
+    }
+
+    if (ispunct((unsigned char)word[strlen(word)-1]))
+       {
+          /* Skip this character */
+          words[offset*20+strlen(word)-1]=0;
+          count_array[offset]=count;
+          offset+=1;
+       }
+    else{
+        words[offset*20+strlen(word)-1]=word[strlen(word)-1];
+        count+=1;
+        words[offset*20+strlen(word)]=0;
+        count_array[offset]=count;
+        offset+=1;
+    }
+    return offset;
+
+}
+
+__global__ void nCountGram(int* d_count, int* d_hist, int N){
+    tx=threadId.x
+    printf("");
+}
+
+int main(int argc,char **argv) {
+    // Helper vars
+    int loop;
+    float time_spent;
+
+    int N = atoi(argv[1]);
+    char *filename = argv[2];
+    int count_array[MAXWORDS];
+    char words[MAXWORDS * 20];
+
+    // For calculating N-count-grams
+    // Filename: shaks.txt
+    // Stores all words in 1D array
+    // Single word length is bounded by 20
+    // Take input string into this
+    char curWord[20];
+    int totalWordCount = 0;
+    FILE *ipf;
+    ipf = fopen(filename, "r");
+    while (fscanf(ipf, "%s ", curWord) != EOF && totalWordCount < MAXWORDS) {
+         // Count of number of words read
+        printf("Curr word %s \n",curWord);
+        totalWordCount=checkWord(curWord,words,count_array,totalWordCount);
+        //printf("Current word %s \n",curWord);
+        //printf("Word count %d \n",totalWordCount);
+    }
+    fclose(ipf);
+
+    
+    for (loop=0;loop<totalWordCount;loop++){
+        printf("Word %d %s \n",loop,&words[20*loop]);
+        printf("Char count %d \n",count_array[loop]);
+    }
+    // Check for word properties
+    // and update ‘words[]’ array.
+    // Modify this section according
+    // to below mentioned properties
+
+    // Create GPU arrays, Copy count array from host memory to device memory
+    cudaMalloc(&d_count, MAXWORDS);
+    cudaMemcpy(d_count, count_array, MAXWORDS,cudaMemcpyHostToDevice);
+    cudaMalloc(&d_hist, pow(20,N));
+
+    // GPU timing
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    // // Invoke kernel
+    dim threadsPerBlock = 1024;
+    dim blocksPerGrid ((pow(20,N) + threadsPerBlock - 1) /threadsPerBlock);
+
+    cudaEventRecord(start, 0);
+    // MatrixMulKernel_col_maj<<<blocksPerGrid, threadsPerBlock>>>(d_matA,d_matB, d_matC, N);
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&time_spent, start, stop);
+    printf("\nTime spent in col maj %f\n",time_spent);
+
+    // // h_C contains the result in host memory
+    // cudaMemcpy(h_matC, d_matC, size,cudaMemcpyDeviceToHost);
+
+    // printf("\n\nMatrix C via col major (first 10*10 outputs)\n");
+    // for(loop1 = 0; loop1 < 10; loop1++){
+    //     for (loop2=0;loop2 < 10; loop2++)
+    //         printf("%f ", *(h_matC + N*loop1 + loop2));
+    // }
+
+    // cudaEventRecord(start, 0);
+    // MatrixMulKernel_row_maj<<<blocksPerGrid, threadsPerBlock>>>(d_matA,d_matB, d_matC, N);
+    // cudaEventRecord(stop, 0);
+    // cudaEventSynchronize(stop);
+    // cudaEventElapsedTime(&time_spent, start, stop);
+    // printf("\nTime spent in row maj %f\n",time_spent);
+
+    // // h_C contains the result in host memory
+    // cudaMemcpy(h_matC, d_matC, size,cudaMemcpyDeviceToHost);
+
+    // printf("\n\nMatrix C via row major (first 10*10 outputs)\n");
+    // for(loop1 = 0; loop1 < 10; loop1++){
+    //     for (loop2=0;loop2 < 10; loop2++)
+    //         printf("%f ", *(h_matC + N*loop1 + loop2));
+    // }
+      
+
+    // // Log outputs
+    // printf("\nWritting to file assignment_2_1_out as Mat C");
+    // print_matrix_to_file(h_matC,N,N);
+
+    // // Free device memory
+    // cudaFree(d_matA);
+    // cudaFree(d_matB);
+    // cudaFree(d_matC);
+
+    // // Free host memory
+    // free(h_matA);
+    // free(h_matB);
+    // free(h_matC);
+    return 0;
+}
