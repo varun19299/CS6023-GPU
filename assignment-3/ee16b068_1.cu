@@ -163,7 +163,7 @@ int main(int argc,char **argv) {
 
     printf("\n\n Histogram for N of value %d, total number of words %d \n",N,totalWordCount);
     for(loop = 1; loop < pow(20,N)+1; loop++){
-        a=loop//(unsigned int)pow(20,N-1);
+        a=loop/(unsigned int)pow(20,N-1);
         b=loop;
         printf("Value %d ",a);
          for (loop1=1;loop1 < N; loop1++)
