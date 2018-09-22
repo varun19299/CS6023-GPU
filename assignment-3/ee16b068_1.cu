@@ -99,7 +99,7 @@ __global__ void nCountGram(int* d_count, int* d_hist, int N){
 
 int main(int argc,char **argv) {
     // Helper vars
-    int loop, loop1, a;
+    int loop, loop1, a, b;
     float time_spent;
 
     int N = atoi(argv[1]);
@@ -166,9 +166,11 @@ int main(int argc,char **argv) {
         if (h_hist[loop]>0){
         printf("Value ");
         a=loop/(unsigned int)pow(20,N-1);
+        b=loop;
          for (loop1=1;loop1 < N; loop1++)
             printf("%u  ", a);
-            a-=a*(unsigned int)pow(20,N-loop1);
+            a=b-a*(unsigned int)pow(20,N-loop1);
+            b=a;
             a/=(unsigned int)pow(20,N-loop1-1);
 
         printf(" Count: %u \n",h_hist[loop]);
