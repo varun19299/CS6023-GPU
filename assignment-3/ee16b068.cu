@@ -6,6 +6,33 @@
 #define MAXWORDS 20000
 //#define MAXWORDS 10
 
+void print_to_file(int *h_hist, int N)
+{
+  const char *fname = "assignment3_out";
+  FILE *f = fopen(fname, "w");
+  for(unsigned i=0; i < numRows; i++)
+  {
+     for(unsigned j=0; j < numCols; j++)
+     fprintf(f,"%4.4f ", mat[i*numCols + j]);
+     fprintf(f,"\n");
+}
+int loop, loop1;
+    for(loop = 0; loop < pow(20,N); loop++){
+        if (h_hist[loop]>0){
+            a=loop/(int)pow(20,N-1);
+            b=loop;
+            fprintf(f,"%d ",a+1);
+            for (loop1=1;loop1 < N; loop1++){
+                a=b-a*(int)pow(20,N-loop1);
+                b=a;
+                a/=(int)pow(20,N-loop1-1);
+                fprintf(f,"%d  ", a+1);
+            }
+            fprintf(f,"%d \n",h_hist[loop]);
+        }
+    }
+fclose(f); }
+
 int checkWord(char* word,char* words,int* count_array,int offset){
     // Check if word meets, else pre-process
     // Args:
@@ -189,17 +216,17 @@ int main(int argc,char **argv) {
     ipf = fopen(filename, "r");
     while (fscanf(ipf, "%s ", curWord) != EOF && totalWordCount < MAXWORDS) {
          // Count of number of words read
-        printf("Curr word %s \n",curWord);
+        //printf("Curr word %s \n",curWord);
         totalWordCount=checkWord(curWord,words,count_array,totalWordCount);
         //printf("Current word %s \n",curWord);
         //printf("Word count %d \n",totalWordCount);
     }
     fclose(ipf);
 
-    for (loop=0;loop<totalWordCount;loop++){
-        printf("Word %d %s ",loop,&words[20*loop]);
-        printf("Char count %d \n",count_array[loop]);
-    }
+    //for (loop=0;loop<totalWordCount;loop++){
+    //    printf("Word %d %s ",loop,&words[20*loop]);
+    //    printf("Char count %d \n",count_array[loop]);
+    //}
     // Check for word properties
     // and update ‘words[]’ array.
     // Modify this section according
@@ -246,22 +273,23 @@ int main(int argc,char **argv) {
 
     // h_hist contains the result in host memory
     cudaMemcpy(h_hist, d_hist, (int)pow(20,N)*sizeof(int),cudaMemcpyDeviceToHost);
+    print_to_file(h_hist,N);
 
-    printf("\n\n Histogram for N of value %d, total number of words %d \n",N,totalWordCount);
-    for(loop = 0; loop < pow(20,N); loop++){
-        if (h_hist[loop]>0){
-            a=loop/(int)pow(20,N-1);
-            b=loop;
-            printf("Value %d ",a+1);
-            for (loop1=1;loop1 < N; loop1++){
-                a=b-a*(int)pow(20,N-loop1);
-                b=a;
-                a/=(int)pow(20,N-loop1-1);
-                printf("%d  ", a+1);
-            }
-            printf(" Count: %d \n",h_hist[loop]);
-        }
-    }
+    // printf("\n\n Histogram for N of value %d, total number of words %d \n",N,totalWordCount);
+    // for(loop = 0; loop < pow(20,N); loop++){
+    //     if (h_hist[loop]>0){
+    //         a=loop/(int)pow(20,N-1);
+    //         b=loop;
+    //         printf("Value %d ",a+1);
+    //         for (loop1=1;loop1 < N; loop1++){
+    //             a=b-a*(int)pow(20,N-loop1);
+    //             b=a;
+    //             a/=(int)pow(20,N-loop1-1);
+    //             printf("%d  ", a+1);
+    //         }
+    //         printf(" Count: %d \n",h_hist[loop]);
+    //     }
+    // }
 
     // Free device memory
     cudaFree(d_count);
