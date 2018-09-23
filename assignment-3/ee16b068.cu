@@ -10,13 +10,8 @@ void print_to_file(int *h_hist, int N)
 {
   const char *fname = "assignment3_out";
   FILE *f = fopen(fname, "w");
-  for(unsigned i=0; i < numRows; i++)
-  {
-     for(unsigned j=0; j < numCols; j++)
-     fprintf(f,"%4.4f ", mat[i*numCols + j]);
-     fprintf(f,"\n");
-}
-int loop, loop1;
+  
+int loop, loop1,a,b;
     for(loop = 0; loop < pow(20,N); loop++){
         if (h_hist[loop]>0){
             a=loop/(int)pow(20,N-1);
