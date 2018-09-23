@@ -47,7 +47,7 @@ int checkWord(char* word,char* words,int* count_array,int offset){
        if (word[loop]=='-')
        {
           words[offset*20+loop]=0;
-          printf("Word %s \n",&words[offset*20]);
+          //printf("Word %s \n",&words[offset*20]);
           offset+=1;
           count_array[offset]=count;
           count=0;
@@ -124,7 +124,7 @@ __global__ void nCountGram_optimal(int* d_count, int* d_hist, int N, int totalWo
         if (threadIdx.x + p*1024 < sub_hist_size){
             atomicAdd( &(d_hist[threadIdx.x + sub_hist_size*blockIdx.y + p*1024]), temp[threadIdx.x + p*1024] );
             if (d_hist[threadIdx.x+ sub_hist_size*blockIdx.y + p*1024]>0){
-                printf("Hist val at %d is %d \n",threadIdx.x+sub_hist_size*blockIdx.y+p*1024,d_hist[threadIdx.x +sub_hist_size*blockIdx.y+ p*1024]);
+                //printf("Hist val at %d is %d \n",threadIdx.x+sub_hist_size*blockIdx.y+p*1024,d_hist[threadIdx.x +sub_hist_size*blockIdx.y+ p*1024]);
             }
         }
     }
@@ -146,7 +146,7 @@ __global__ void nCountGram(int* d_count, int* d_hist, int N, int totalWordCount)
     for (p=0;p<N;p++){
         a*=20;
     }
-    printf("t %d",threadIdx.x + 1*1024);
+    //printf("t %d",threadIdx.x + 1*1024);
 
 
     for (p=0; p<a/1024+1; p++){
@@ -159,7 +159,7 @@ __global__ void nCountGram(int* d_count, int* d_hist, int N, int totalWordCount)
 
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int offset = blockDim.x * gridDim.x;
-    printf("Offset %d",offset);
+    //printf("Offset %d",offset);
     while (i < totalWordCount - N + 1)
     {
         // Since 0,0 is invalid
@@ -171,7 +171,7 @@ __global__ void nCountGram(int* d_count, int* d_hist, int N, int totalWordCount)
         }
         atomicAdd( &temp[index], 1);
         i += offset;
-        printf("Index %d",index);
+        //printf("Index %d",index);
     }
 
     __syncthreads();
