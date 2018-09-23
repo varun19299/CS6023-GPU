@@ -118,7 +118,7 @@ int main(int argc,char **argv) {
 
         size_t blocksize = 2 * TILE_WIDTH * TILE_WIDTH;
 
-        cudaEventRecord(start, 0);
+        cudaEventRecord(start, 0); 
         MatrixMulKernel_col_maj<<<blocksPerGrid, threadsPerBlock, sizeof(double)*blocksize>>>(d_matA,d_matB, d_matC, N, TILE_WIDTH);
         //cudaDeviceSynchronize();//To synchronize the device
         cudaEventRecord(stop, 0);

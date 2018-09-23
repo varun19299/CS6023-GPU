@@ -4,6 +4,7 @@
 #include <string.h>
 
 #define MAXWORDS 20000
+//#define MAXWORDS 10
 
 int checkWord(char* word,char* words,int* count_array,int offset){
     // Check if word meets, else pre-process
@@ -54,52 +55,122 @@ int checkWord(char* word,char* words,int* count_array,int offset){
 
 }
 
-__global__ void nCountGram(int* d_count, int* d_hist, int N){
-    extern __shared__ unsigned int buffer[];
-    unsigned int *temp = &buffer[0];
-    //__shared__ unsigned int temp[1024];
+__global__ void nCountGram_optimal(int* d_count, int* d_hist, int N, int totalWordCount, int sub_hist_size){
+    extern __shared__ int buffer[];
+    int *temp = &buffer[0];
 
+    //__shared__ int temp[1024];
     // Helper var
     int index, j, p;
+    int a, b;
 
-    int a;
+    a=1;
     for (p=0;p<N;p++){
         a*=20;
     }
 
-    int b;
-
-    for (p=0;p<a/1024+1;p++){
-    temp[threadIdx.x + p*1024] = 0;
+    for (p=0; p<sub_hist_size/1024 +1; p++){
+        if (threadIdx.x + p*1024 < sub_hist_size){
+            temp[threadIdx.x + p*1024] = 0;
+        }
     }
+
     __syncthreads();
 
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    int offset = blockDim.x * gridDim.x;
+    int i = threadIdx.x + blockIdx.x * blockDim.x ;//blockIdx.y*gridDim.y;
+    int offset = blockDim.x * gridDim.x*blockIdx.y*gridDim.y;
 
-    while (i < a)
+    while (i < totalWordCount - N + 1)
     {
         // Since 0,0 is invalid
         index=-1;
         b=a/20;
         for (j = 0;j < N; j++){
-            index+=d_count[i+j]*b;
+            index+=(d_count[i+j])*b;
             b/=20;
         }
-    atomicAdd( &temp[index], 1);
-    i += offset;
+        if ((index<sub_hist_size*(blockIdx.y+1)) && (index > sub_hist_size*blockIdx.y)){
+            //printf("Index %d",index);
+        atomicAdd( &temp[index - blockIdx.y*sub_hist_size], 1);
+        }
+        i += offset;
+    }
+
+    __syncthreads();
+
+    for (p=0;p<sub_hist_size/1024+1;p++){
+        if (threadIdx.x + p*1024 < sub_hist_size){
+            atomicAdd( &(d_hist[threadIdx.x + sub_hist_size*blockIdx.y + p*1024]), temp[threadIdx.x + p*1024] );
+            if (d_hist[threadIdx.x+ sub_hist_size*blockIdx.y + p*1024]>0){
+                printf("Hist val at %d is %d \n",threadIdx.x+sub_hist_size*blockIdx.y+p*1024,d_hist[threadIdx.x +sub_hist_size*blockIdx.y+ p*1024]);
+            }
+        }
+    }
+
+    __syncthreads();
+
+}
+
+__global__ void nCountGram(int* d_count, int* d_hist, int N, int totalWordCount){
+    extern __shared__ int buffer[];
+    int *temp = &buffer[0];
+
+    //__shared__ int temp[1024];
+    // Helper var
+    int index, j, p;
+    int a, b;
+
+    a=1;
+    for (p=0;p<N;p++){
+        a*=20;
+    }
+    printf("t %d",threadIdx.x + 1*1024);
+
+
+    for (p=0; p<a/1024+1; p++){
+        if (threadIdx.x + p*1024< a){
+            temp[threadIdx.x + p*1024] = 0;
+        }
+    }
+
+    __syncthreads();
+
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int offset = blockDim.x * gridDim.x;
+    printf("Offset %d",offset);
+    while (i < totalWordCount - N + 1)
+    {
+        // Since 0,0 is invalid
+        index=-1;
+        b=a/20;
+        for (j = 0;j < N; j++){
+            index+=(d_count[i+j])*b;
+            b/=20;
+        }
+        atomicAdd( &temp[index], 1);
+        i += offset;
+        printf("Index %d",index);
     }
 
     __syncthreads();
 
     for (p=0;p<a/1024+1;p++){
-        atomicAdd( &(d_hist[threadIdx.x + p*1024]), temp[threadIdx.x + p*1024] );
+        if (threadIdx.x + p*1024< a){
+            atomicAdd( &(d_hist[threadIdx.x + p*1024]), temp[threadIdx.x + p*1024] );
+            if (temp[threadIdx.x+p*1024]>0){
+                //printf("Hist val at %d is %d \n",threadIdx.x+p*1024,d_hist[threadIdx.x + p*1024]);
+            }
         }
+    }
+
+    __syncthreads();
+
 }
 
 int main(int argc,char **argv) {
     // Helper vars
     int loop, loop1, a, b;
+    int sub_hists, sub_hist_size;
     float time_spent;
 
     int N = atoi(argv[1]);
@@ -126,7 +197,7 @@ int main(int argc,char **argv) {
     fclose(ipf);
 
     for (loop=0;loop<totalWordCount;loop++){
-        printf("Word %d %s \n",loop,&words[20*loop]);
+        printf("Word %d %s ",loop,&words[20*loop]);
         printf("Char count %d \n",count_array[loop]);
     }
     // Check for word properties
@@ -135,12 +206,13 @@ int main(int argc,char **argv) {
     // to below mentioned properties
 
     //Create CPU arrays (hist)
-    unsigned int* h_hist = (unsigned int*)malloc((unsigned int)pow(20,N)*sizeof(unsigned int));
+    int* h_hist = (int*)malloc((int)pow(20,N)*sizeof(int));
 
     // Create GPU arrays, Copy count array from host memory to device memory
     int* d_count; cudaMalloc(&d_count, MAXWORDS*sizeof(int));
     cudaMemcpy(d_count, count_array, MAXWORDS*sizeof(int),cudaMemcpyHostToDevice);
-    int* d_hist; cudaMalloc(&d_hist, (unsigned int)pow(20,N)*sizeof(unsigned int));
+    
+    int* d_hist; cudaMalloc(&d_hist, (int)pow(20,N)*sizeof(int));
 
     // GPU timing
     cudaEvent_t start, stop;
@@ -148,33 +220,48 @@ int main(int argc,char **argv) {
     cudaEventCreate(&stop);
 
     // // Invoke kernel
-    dim3 threadsPerBlock = 1024;
-    dim3 blocksPerGrid ((pow(20,N) + threadsPerBlock.x - 1) /threadsPerBlock.x);
-
-    cudaEventRecord(start, 0);
-    nCountGram<<<blocksPerGrid, threadsPerBlock, (unsigned int)pow(N,20)*sizeof(unsigned int)>>>(d_count,d_hist, N);
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&time_spent, start, stop);
-    printf("\nTime spent in col maj %f\n",time_spent);
+    if (N<5){
+        int threadsPerBlock = 1024;
+        int blocksPerGrid = ((pow(20,N) + threadsPerBlock - 1) /threadsPerBlock);
+        cudaEventRecord(start, 0);
+        nCountGram<<<blocksPerGrid, threadsPerBlock, (unsigned int)pow(20,N)*sizeof(int)>>>(d_count,d_hist, N,totalWordCount);
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&time_spent, start, stop);
+        printf("\nTime spent in hist binning %f\n",time_spent);
+    }
+    else{
+        sub_hist_size=160000;
+        sub_hists=(int)pow(20,N)/sub_hist_size;
+        int threadsPerBlock = 1024;
+        dim3 blocksPerGrid = (((pow(20,N)/sub_hists + threadsPerBlock - 1) /threadsPerBlock),sub_hists);
+        cudaEventRecord(start, 0);
+        nCountGram_optimal<<<blocksPerGrid, threadsPerBlock, sub_hist_size*sizeof(int)>>>(d_count,d_hist, N,totalWordCount,sub_hist_size);
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&time_spent, start, stop);
+        printf("\nTime spent in hist binning %f\n",time_spent);
+    }
+    
 
     // h_hist contains the result in host memory
-    cudaMemcpy(h_hist, d_hist, (unsigned int)pow(20,N)*sizeof(unsigned int),cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_hist, d_hist, (int)pow(20,N)*sizeof(int),cudaMemcpyDeviceToHost);
 
     printf("\n\n Histogram for N of value %d, total number of words %d \n",N,totalWordCount);
-    printf("Vallll %f",1);
-    for(loop = 1; loop < pow(20,N)+1; loop++){
-        a=loop/(unsigned int)pow(20,N-1);
-        b=loop;
-        printf("Value %d ",a);
-         for (loop1=1;loop1 < N; loop1++)
-            printf("%d  ", a);
-            a=b-a*(unsigned int)pow(20,N-loop1);
-            b=a;
-            a/=(unsigned int)pow(20,N-loop1-1);
-
-        printf(" Count: %u \n",h_hist[loop]);
-     }
+    for(loop = 0; loop < pow(20,N); loop++){
+        if (h_hist[loop]>0){
+            a=loop/(int)pow(20,N-1);
+            b=loop;
+            printf("Value %d ",a+1);
+            for (loop1=1;loop1 < N; loop1++){
+                a=b-a*(int)pow(20,N-loop1);
+                b=a;
+                a/=(int)pow(20,N-loop1-1);
+                printf("%d  ", a+1);
+            }
+            printf(" Count: %d \n",h_hist[loop]);
+        }
+    }
 
     // Free device memory
     cudaFree(d_count);
